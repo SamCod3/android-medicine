@@ -28,7 +28,13 @@ data class ReminderEntity(
     val medicationId: String,
     val hour: Int,           // 0-23
     val minute: Int,         // 0-59
-    val daysOfWeek: Int,     // Bitmask: Mon=1, Tue=2, Wed=4, Thu=8, Fri=16, Sat=32, Sun=64, 0=every day
+    
+    // Schedule type and configuration
+    val scheduleType: String = "DAILY",  // ScheduleType enum name
+    val daysOfWeek: Int = 0,             // Bitmask for WEEKLY: Mon=1, Tue=2, Wed=4, Thu=8, Fri=16, Sat=32, Sun=64
+    val intervalDays: Int = 1,           // For INTERVAL: every X days
+    val dayOfMonth: Int = 1,             // For MONTHLY: day 1-31
+    val startDate: Long = System.currentTimeMillis(), // Start date for INTERVAL calculations
     
     // Structured dosage fields
     val dosageQuantity: Int = 1,
@@ -46,11 +52,9 @@ data class ReminderEntity(
         const val FRIDAY = 16
         const val SATURDAY = 32
         const val SUNDAY = 64
-        const val EVERY_DAY = 0
         
         fun isDayEnabled(daysOfWeek: Int, dayFlag: Int): Boolean {
-            return if (daysOfWeek == EVERY_DAY) true
-            else (daysOfWeek and dayFlag) != 0
+            return (daysOfWeek and dayFlag) != 0
         }
     }
     
@@ -69,6 +73,42 @@ data class ReminderEntity(
             else -> "$dosageQuantity ${if (dosageQuantity == 1) type.singular else type.displayName}"
         }
     }
+    
+    /**
+     * Generates the formatted schedule string for display.
+     */
+    fun formatSchedule(): String {
+        val type = ScheduleType.entries.find { it.name == scheduleType } ?: ScheduleType.DAILY
+        return when (type) {
+            ScheduleType.DAILY -> "Todos los días"
+            ScheduleType.WEEKLY -> formatWeeklyDays()
+            ScheduleType.INTERVAL -> "Cada $intervalDays ${if (intervalDays == 1) "día" else "días"}"
+            ScheduleType.MONTHLY -> "Día $dayOfMonth de cada mes"
+        }
+    }
+    
+    private fun formatWeeklyDays(): String {
+        if (daysOfWeek == 0 || daysOfWeek == 127) return "Todos los días"
+        return buildString {
+            if ((daysOfWeek and MONDAY) != 0) append("L ")
+            if ((daysOfWeek and TUESDAY) != 0) append("M ")
+            if ((daysOfWeek and WEDNESDAY) != 0) append("X ")
+            if ((daysOfWeek and THURSDAY) != 0) append("J ")
+            if ((daysOfWeek and FRIDAY) != 0) append("V ")
+            if ((daysOfWeek and SATURDAY) != 0) append("S ")
+            if ((daysOfWeek and SUNDAY) != 0) append("D")
+        }.trim()
+    }
+}
+
+/**
+ * Types of reminder schedules.
+ */
+enum class ScheduleType(val displayName: String) {
+    DAILY("Todos los días"),
+    WEEKLY("Días de la semana"),
+    INTERVAL("Cada X días"),
+    MONTHLY("Día del mes")
 }
 
 /**

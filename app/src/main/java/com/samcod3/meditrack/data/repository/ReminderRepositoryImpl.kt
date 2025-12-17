@@ -5,6 +5,7 @@ import com.samcod3.meditrack.data.local.dao.ReminderDao
 import com.samcod3.meditrack.data.local.entity.DosageType
 import com.samcod3.meditrack.data.local.entity.Portion
 import com.samcod3.meditrack.data.local.entity.ReminderEntity
+import com.samcod3.meditrack.data.local.entity.ScheduleType
 import com.samcod3.meditrack.domain.model.Reminder
 import com.samcod3.meditrack.domain.repository.ReminderRepository
 import kotlinx.coroutines.flow.Flow
@@ -35,7 +36,10 @@ class ReminderRepositoryImpl(
         medicationId: String,
         hour: Int,
         minute: Int,
+        scheduleType: ScheduleType,
         daysOfWeek: Int,
+        intervalDays: Int,
+        dayOfMonth: Int,
         dosageQuantity: Int,
         dosageType: DosageType,
         dosagePortion: Portion?
@@ -44,7 +48,10 @@ class ReminderRepositoryImpl(
             medicationId = medicationId,
             hour = hour,
             minute = minute,
+            scheduleType = scheduleType.name,
             daysOfWeek = daysOfWeek,
+            intervalDays = intervalDays,
+            dayOfMonth = dayOfMonth,
             dosageQuantity = dosageQuantity,
             dosageType = dosageType.name,
             dosagePortion = dosagePortion?.name
@@ -58,7 +65,11 @@ class ReminderRepositoryImpl(
             medicationId = reminder.medicationId,
             hour = reminder.hour,
             minute = reminder.minute,
+            scheduleType = reminder.scheduleType.name,
             daysOfWeek = reminder.daysOfWeek,
+            intervalDays = reminder.intervalDays,
+            dayOfMonth = reminder.dayOfMonth,
+            startDate = reminder.startDate,
             dosageQuantity = reminder.dosageQuantity,
             dosageType = reminder.dosageType.name,
             dosagePortion = reminder.dosagePortion?.name,
@@ -83,7 +94,11 @@ class ReminderRepositoryImpl(
             medicationName = medication?.name ?: "",
             hour = hour,
             minute = minute,
+            scheduleType = ScheduleType.entries.find { it.name == scheduleType } ?: ScheduleType.DAILY,
             daysOfWeek = daysOfWeek,
+            intervalDays = intervalDays,
+            dayOfMonth = dayOfMonth,
+            startDate = startDate,
             dosageQuantity = dosageQuantity,
             dosageType = DosageType.entries.find { it.name == dosageType } ?: DosageType.COMPRIMIDO,
             dosagePortion = dosagePortion?.let { p -> Portion.entries.find { it.name == p } },

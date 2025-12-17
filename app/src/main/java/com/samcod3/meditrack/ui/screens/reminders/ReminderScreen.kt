@@ -1,7 +1,11 @@
 package com.samcod3.meditrack.ui.screens.reminders
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,10 +13,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -26,12 +34,16 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,18 +53,23 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.samcod3.meditrack.data.local.entity.DosageType
 import com.samcod3.meditrack.data.local.entity.Portion
+import com.samcod3.meditrack.data.local.entity.ScheduleType
 import com.samcod3.meditrack.domain.model.Reminder
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,8 +132,8 @@ fun ReminderScreen(
     if (showAddDialog) {
         AddReminderDialog(
             onDismiss = { viewModel.hideAddReminderDialog() },
-            onConfirm = { hour, minute, quantity, type, portion ->
-                viewModel.addReminder(hour, minute, 0, quantity, type, portion)
+            onConfirm = { hour, minute, scheduleType, daysOfWeek, intervalDays, dayOfMonth, quantity, type, portion ->
+                viewModel.addReminder(hour, minute, scheduleType, daysOfWeek, intervalDays, dayOfMonth, quantity, type, portion)
             }
         )
     }
@@ -182,7 +199,7 @@ private fun ReminderCard(
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = reminder.daysFormatted,
+                    text = reminder.scheduleFormatted,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -211,16 +228,30 @@ private fun ReminderCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AddReminderDialog(
     onDismiss: () -> Unit,
-    onConfirm: (hour: Int, minute: Int, quantity: Int, type: DosageType, portion: Portion?) -> Unit
+    onConfirm: (
+        hour: Int, 
+        minute: Int, 
+        scheduleType: ScheduleType,
+        daysOfWeek: Int,
+        intervalDays: Int,
+        dayOfMonth: Int,
+        quantity: Int, 
+        type: DosageType, 
+        portion: Portion?
+    ) -> Unit
 ) {
-    val timePickerState = rememberTimePickerState(
-        initialHour = 8,
-        initialMinute = 0
-    )
+    val timePickerState = rememberTimePickerState(initialHour = 8, initialMinute = 0)
+    
+    // Schedule state
+    var selectedScheduleType by remember { mutableStateOf(ScheduleType.DAILY) }
+    var selectedDays by remember { mutableIntStateOf(0) } // bitmask
+    var intervalDays by remember { mutableFloatStateOf(2f) }
+    var dayOfMonth by remember { mutableFloatStateOf(1f) }
+    var expandedSchedule by remember { mutableStateOf(false) }
     
     // Dosage state
     var quantity by remember { mutableStateOf("1") }
@@ -233,11 +264,90 @@ private fun AddReminderDialog(
         onDismissRequest = onDismiss,
         title = { Text("Nuevo recordatorio") },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                // Time picker
                 TimePicker(state = timePickerState)
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
+                // Schedule section
+                Text(
+                    text = "Frecuencia",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Schedule type dropdown
+                ExposedDropdownMenuBox(
+                    expanded = expandedSchedule,
+                    onExpandedChange = { expandedSchedule = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedScheduleType.displayName,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedSchedule) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedSchedule,
+                        onDismissRequest = { expandedSchedule = false }
+                    ) {
+                        ScheduleType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type.displayName) },
+                                onClick = {
+                                    selectedScheduleType = type
+                                    expandedSchedule = false
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Schedule type specific options
+                when (selectedScheduleType) {
+                    ScheduleType.WEEKLY -> {
+                        Text("Selecciona los días:", style = MaterialTheme.typography.bodySmall)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        DayOfWeekSelector(
+                            selectedDays = selectedDays,
+                            onDaysChanged = { selectedDays = it }
+                        )
+                    }
+                    ScheduleType.INTERVAL -> {
+                        Text("Cada ${intervalDays.roundToInt()} días", style = MaterialTheme.typography.bodyMedium)
+                        Slider(
+                            value = intervalDays,
+                            onValueChange = { intervalDays = it },
+                            valueRange = 2f..30f,
+                            steps = 27,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    ScheduleType.MONTHLY -> {
+                        Text("Día ${dayOfMonth.roundToInt()} de cada mes", style = MaterialTheme.typography.bodyMedium)
+                        Slider(
+                            value = dayOfMonth,
+                            onValueChange = { dayOfMonth = it },
+                            valueRange = 1f..31f,
+                            steps = 29,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    ScheduleType.DAILY -> { /* No extra options */ }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Dosage section
                 Text(
                     text = "Dosis",
                     style = MaterialTheme.typography.titleSmall,
@@ -246,7 +356,6 @@ private fun AddReminderDialog(
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Quantity input
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -260,7 +369,6 @@ private fun AddReminderDialog(
                         singleLine = true
                     )
                     
-                    // Dosage type dropdown
                     ExposedDropdownMenuBox(
                         expanded = expandedType,
                         onExpandedChange = { expandedType = it },
@@ -291,10 +399,8 @@ private fun AddReminderDialog(
                     }
                 }
                 
-                // Show portion selector for applicable types
                 if (selectedDosageType == DosageType.PORCION) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    
                     ExposedDropdownMenuBox(
                         expanded = expandedPortion,
                         onExpandedChange = { expandedPortion = it },
@@ -306,9 +412,7 @@ private fun AddReminderDialog(
                             readOnly = true,
                             label = { Text("Fracción") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPortion) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
+                            modifier = Modifier.fillMaxWidth().menuAnchor()
                         )
                         ExposedDropdownMenu(
                             expanded = expandedPortion,
@@ -335,6 +439,10 @@ private fun AddReminderDialog(
                 onConfirm(
                     timePickerState.hour,
                     timePickerState.minute,
+                    selectedScheduleType,
+                    selectedDays,
+                    intervalDays.roundToInt(),
+                    dayOfMonth.roundToInt(),
                     qty,
                     selectedDosageType,
                     portion
@@ -349,4 +457,47 @@ private fun AddReminderDialog(
             }
         }
     )
+}
+
+@Composable
+private fun DayOfWeekSelector(
+    selectedDays: Int,
+    onDaysChanged: (Int) -> Unit
+) {
+    val days = listOf(
+        "L" to 1,
+        "M" to 2,
+        "X" to 4,
+        "J" to 8,
+        "V" to 16,
+        "S" to 32,
+        "D" to 64
+    )
+    
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        days.forEach { (label, flag) ->
+            val isSelected = (selectedDays and flag) != 0
+            Surface(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clickable {
+                        onDaysChanged(if (isSelected) selectedDays and flag.inv() else selectedDays or flag)
+                    },
+                shape = CircleShape,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                border = if (!isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null
+            ) {
+                Text(
+                    text = label,
+                    modifier = Modifier.padding(8.dp),
+                    textAlign = TextAlign.Center,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
 }

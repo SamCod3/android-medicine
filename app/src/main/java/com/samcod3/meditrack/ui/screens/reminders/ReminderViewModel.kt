@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.samcod3.meditrack.data.local.entity.DosageType
 import com.samcod3.meditrack.data.local.entity.Portion
+import com.samcod3.meditrack.data.local.entity.ScheduleType
 import com.samcod3.meditrack.domain.model.Reminder
 import com.samcod3.meditrack.domain.repository.ReminderRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,8 +40,13 @@ class ReminderViewModel(
     
     fun addReminder(
         hour: Int, 
-        minute: Int, 
-        daysOfWeek: Int, 
+        minute: Int,
+        // Schedule options
+        scheduleType: ScheduleType,
+        daysOfWeek: Int,
+        intervalDays: Int,
+        dayOfMonth: Int,
+        // Dosage options
         dosageQuantity: Int,
         dosageType: DosageType,
         dosagePortion: Portion?
@@ -50,7 +56,10 @@ class ReminderViewModel(
                 medicationId = medicationId,
                 hour = hour,
                 minute = minute,
+                scheduleType = scheduleType,
                 daysOfWeek = daysOfWeek,
+                intervalDays = intervalDays,
+                dayOfMonth = dayOfMonth,
                 dosageQuantity = dosageQuantity,
                 dosageType = dosageType,
                 dosagePortion = dosagePortion

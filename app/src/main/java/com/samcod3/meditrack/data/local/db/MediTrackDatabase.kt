@@ -15,7 +15,7 @@ import com.samcod3.meditrack.data.local.entity.ReminderEntity
         MedicationEntity::class,
         ReminderEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class MediTrackDatabase : RoomDatabase() {
