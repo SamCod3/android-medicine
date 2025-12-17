@@ -12,6 +12,7 @@ import com.samcod3.meditrack.ui.screens.leaflet.LeafletScreen
 import com.samcod3.meditrack.ui.screens.main.MainScreen
 import com.samcod3.meditrack.ui.screens.profiles.ProfileViewModel
 import com.samcod3.meditrack.ui.screens.profiles.ProfilesScreen
+import com.samcod3.meditrack.ui.screens.reminders.ReminderScreen
 import org.koin.androidx.compose.koinViewModel
 
 sealed class Screen(val route: String) {
@@ -22,6 +23,10 @@ sealed class Screen(val route: String) {
     }
     data object Leaflet : Screen("leaflet/{nationalCode}/{profileId}") {
         fun createRoute(nationalCode: String, profileId: String) = "leaflet/$nationalCode/$profileId"
+    }
+    data object Reminders : Screen("reminders/{medicationId}/{medicationName}") {
+        fun createRoute(medicationId: String, medicationName: String) = 
+            "reminders/$medicationId/${java.net.URLEncoder.encode(medicationName, "UTF-8")}"
     }
 }
 
@@ -67,6 +72,9 @@ fun MediTrackNavHost() {
                 onMedicationClicked = { nationalCode ->
                     navController.navigate(Screen.Leaflet.createRoute(nationalCode, profileId))
                 },
+                onReminderClick = { medicationId, medicationName ->
+                    navController.navigate(Screen.Reminders.createRoute(medicationId, medicationName))
+                },
                 onChangeProfile = {
                     navController.navigate(Screen.Profiles.route) {
                         popUpTo(Screen.Main.route) { inclusive = true }
@@ -92,6 +100,30 @@ fun MediTrackNavHost() {
                 onMedicationSaved = {
                     navController.popBackStack()
                 }
+            )
+        }
+        
+        composable(
+            route = Screen.Reminders.route,
+            arguments = listOf(
+                navArgument("medicationId") { type = NavType.StringType },
+                navArgument("medicationName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val medicationId = backStackEntry.arguments?.getString("medicationId") ?: ""
+            val medicationName = try {
+                java.net.URLDecoder.decode(
+                    backStackEntry.arguments?.getString("medicationName") ?: "",
+                    "UTF-8"
+                )
+            } catch (e: Exception) {
+                backStackEntry.arguments?.getString("medicationName") ?: "Medicamento"
+            }
+            
+            ReminderScreen(
+                medicationId = medicationId,
+                medicationName = medicationName,
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

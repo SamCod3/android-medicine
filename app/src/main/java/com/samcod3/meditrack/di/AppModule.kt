@@ -3,6 +3,7 @@ package com.samcod3.meditrack.di
 import com.samcod3.meditrack.ui.screens.home.HomeViewModel
 import com.samcod3.meditrack.ui.screens.leaflet.LeafletViewModel
 import com.samcod3.meditrack.ui.screens.profiles.ProfileViewModel
+import com.samcod3.meditrack.ui.screens.reminders.ReminderViewModel
 import com.samcod3.meditrack.ui.screens.scanner.ScannerViewModel
 import com.samcod3.meditrack.ui.screens.search.SearchViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -27,6 +28,14 @@ val appModule = module {
         HomeViewModel(
             profileId = params[0],
             userMedicationRepository = get()
+        )
+    }
+    // ReminderViewModel needs: medicationId, medicationName, reminderRepo
+    viewModel { params ->
+        ReminderViewModel(
+            medicationId = params[0],
+            medicationName = params[1],
+            reminderRepository = get()
         )
     }
 }

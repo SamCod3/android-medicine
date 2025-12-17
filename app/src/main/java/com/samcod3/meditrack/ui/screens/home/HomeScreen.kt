@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,6 +48,7 @@ fun HomeScreen(
     profileId: String,
     profileName: String,
     onMedicationClick: (String) -> Unit,
+    onReminderClick: (medicationId: String, medicationName: String) -> Unit,
     onChangeProfile: () -> Unit,
     viewModel: HomeViewModel = koinViewModel { parametersOf(profileId) }
 ) {
@@ -87,6 +89,7 @@ fun HomeScreen(
                     SavedMedicationCard(
                         medication = medication,
                         onClick = { onMedicationClick(medication.nationalCode) },
+                        onReminderClick = { onReminderClick(medication.id, medication.name) },
                         onDelete = { viewModel.deleteMedication(medication.id) }
                     )
                 }
@@ -131,6 +134,7 @@ private fun EmptyMedicineKit() {
 private fun SavedMedicationCard(
     medication: SavedMedication,
     onClick: () -> Unit,
+    onReminderClick: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
@@ -179,6 +183,15 @@ private fun SavedMedicationCard(
                     text = "CN: ${medication.nationalCode}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            // Reminder button
+            IconButton(onClick = onReminderClick) {
+                Icon(
+                    imageVector = Icons.Default.Notifications,
+                    contentDescription = "Recordatorios",
+                    tint = MaterialTheme.colorScheme.secondary
                 )
             }
             
