@@ -558,6 +558,12 @@ private fun extractNationalCode(barcode: String): String {
         return extractFromGS1(cleanCode)
     }
     
+    // Check for special prefix 847000 (often used for non-standard or specific medication batches)
+    // Format: 847000 + CN(6 digits) + Check(1 digit)
+    if (cleanCode.startsWith("847000") && cleanCode.length == 13) {
+        return cleanCode.substring(6, 12)
+    }
+
     // Check for EAN-13 (Spanish medications start with 84)
     if (cleanCode.length == 13 && cleanCode.startsWith("84")) {
         // Extract digits 3-8 (the national code portion, 6 digits) and remove leading zeros
