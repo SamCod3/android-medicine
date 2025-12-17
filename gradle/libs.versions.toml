@@ -59,6 +59,7 @@ camerax-view = { group = "androidx.camera", name = "camera-view", version.ref = 
 
 # ML Kit Barcode
 mlkit-barcode = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
+mlkit-text = { group = "com.google.mlkit", name = "text-recognition", version = "16.0.0" }
 
 # Coil for images
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
