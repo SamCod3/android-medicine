@@ -299,29 +299,51 @@ private fun captureAndProcessText(
 
 private fun findCNInText(text: String): String? {
     Log.d("ScannerOCR", "Scanned text: $text")
-    // Regex strategies for National Code (CN)
+    
     // 1. Explicit CN label: "CN: 123456" or "C.N. 123456.7"
     val cnLabelRegex = Regex("""(?:C\.?N\.?|C\.N)\s*[:\.]?\s*(\d{6,7})""", RegexOption.IGNORE_CASE)
     val matchLabel = cnLabelRegex.find(text)
     if (matchLabel != null) return matchLabel.groupValues[1]
     
-    // 2. Just 6-7 digits inside lines that contain typical medication keywords?
-    // Too risky for false positives (expiry dates, lot numbers). 
-    // But usually CN is prominent.
+    // 2. Look for GTIN-14 (0847...) or EAN-13 (84...) patterns often printed on boxes
+    // The OCR might capture "08470007058328" which is a valid GTIN containing the CN.
+    val longNumberRegex = Regex("""\b(\d{13,14})\b""")
+    val longMatches = longNumberRegex.findAll(text)
     
-    // Let's stick to strict label first. If failed, user should retry or we can be looser.
-    // Maybe look for 6-7 digits starting with 6,7,8,9? (CN usually start high?)
-    // Actually CN ranges vary.
+    for (match in longMatches) {
+        val number = match.groupValues[1]
+        
+        // GTIN-14 Spanish format: 0847XXXXXXXXXC
+        if (number.length == 14 && number.startsWith("0847")) {
+            // CN is in positions 4-12 (9 digits)
+            val cnRaw = number.substring(4, 13)
+            return cnRaw.trimStart('0')
+        }
+        
+        // EAN-13 Spanish format: 84XXXXXXXC
+        if (number.length == 13 && number.startsWith("84")) {
+            // CN is in positions 2-9 (7 digits)
+            val cnRaw = number.substring(2, 9)
+            return cnRaw.trimStart('0')
+        }
+    }
     
-    // Fallback: look for generic 6-7 digit sequences and user confirms?
-    // Or check if valid CN (some checksum logic exist but complex).
-    
-    // Let's try to find just a 6-7 digit number if the user specifically asked this image to be scanned.
+    // 3. Fallback: look for 6-7 digits isolated
     val codeRegex = Regex("""\b(\d{6,7})\b""")
-    val matches = codeRegex.findAll(text).map { it.groupValues[1] }.toList()
+    // Filter out unlikely candidates (year numbers like 2024, 2025 unless they look like CN)
+    val matches = codeRegex.findAll(text)
+        .map { it.groupValues[1] }
+        .filter { candidate -> 
+            // Avoid typical year numbers if they appear isolated
+            val num = candidate.toIntOrNull() ?: 0
+            // CNs are usually > 600000. Low numbers usually imply other things.
+            // But strict filtering might be bad. Let's just prefer starting with 6,7,8,9
+            true 
+        }
+        .toList()
     
-    // Heuristic: Prefer numbers starting with 6, 7, 8, 9 (common in CNs)
-    return matches.firstOrNull { it.length == 6 || it.length == 7 }
+    // Heuristic preference
+    return matches.firstOrNull { it.length == 7 } ?: matches.firstOrNull()
 }
 
 @Composable
