@@ -85,6 +85,7 @@ enum class ScanMode {
 @Composable
 fun ScannerScreen(
     onMedicationScanned: (String) -> Unit,
+    onSearchRequested: () -> Unit,
     viewModel: ScannerViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -144,63 +145,81 @@ fun ScannerScreen(
                         )
                     }
                     
-                    // Bottom Bar: Flash & Capture
-                    Row(
+                    // Bottom Bar: Flash & Capture + Manual Search
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Flash Button
-                        FloatingActionButton(
-                            onClick = {
-                                camera?.let { cam ->
-                                    if (cam.cameraInfo.hasFlashUnit()) {
-                                        isFlashOn = !isFlashOn
-                                        cam.cameraControl.enableTorch(isFlashOn)
-                                    }
-                                }
-                            },
-                            containerColor = if (isFlashOn) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                            shape = CircleShape
-                        ) {
-                            Icon(
-                                imageVector = if (isFlashOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                                contentDescription = "Linterna"
-                            )
-                        }
                         
-                        // Capture Button (Only for Text Mode)
-                        if (scanMode == ScanMode.TEXT_OCR) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Flash Button
                             FloatingActionButton(
                                 onClick = {
-                                    if (!isProcessingText && imageCapture != null) {
-                                        isProcessingText = true
-                                        captureAndProcessText(
-                                            imageCapture!!,
-                                            context
-                                        ) { resultCN ->
-                                            isProcessingText = false
-                                            if (resultCN != null) {
-                                                onMedicationScanned(resultCN)
-                                            } else {
-                                                Toast.makeText(context, "No se encontró CN válido", Toast.LENGTH_SHORT).show()
-                                            }
+                                    camera?.let { cam ->
+                                        if (cam.cameraInfo.hasFlashUnit()) {
+                                            isFlashOn = !isFlashOn
+                                            cam.cameraControl.enableTorch(isFlashOn)
                                         }
                                     }
                                 },
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                shape = CircleShape,
-                                modifier = Modifier.size(72.dp)
+                                containerColor = if (isFlashOn) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                shape = CircleShape
                             ) {
-                                if (isProcessingText) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp))
-                                } else {
-                                    Icon(Icons.Default.CameraAlt, contentDescription = "Capturar", modifier = Modifier.size(32.dp))
-                                }
+                                Icon(
+                                    imageVector = if (isFlashOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                                    contentDescription = "Linterna"
+                                )
                             }
-                        } else {
-                            // Spacer to balance layout when no capture button
-                            Spacer(modifier = Modifier.size(56.dp))
+                            
+                            // Capture Button (Only for Text Mode)
+                            if (scanMode == ScanMode.TEXT_OCR) {
+                                FloatingActionButton(
+                                    onClick = {
+                                        if (!isProcessingText && imageCapture != null) {
+                                            isProcessingText = true
+                                            captureAndProcessText(
+                                                imageCapture!!,
+                                                context
+                                            ) { resultCN ->
+                                                isProcessingText = false
+                                                if (resultCN != null) {
+                                                    onMedicationScanned(resultCN)
+                                                } else {
+                                                    Toast.makeText(context, "No se encontró CN válido", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        }
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(72.dp)
+                                ) {
+                                    if (isProcessingText) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp))
+                                    } else {
+                                        Icon(Icons.Default.CameraAlt, contentDescription = "Capturar", modifier = Modifier.size(32.dp))
+                                    }
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.size(56.dp))
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        androidx.compose.material3.TextButton(
+                            onClick = onSearchRequested,
+                            modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        ) {
+                            Text(
+                                text = "¿Problemas? Buscar por nombre",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelLarge
+                            )
                         }
                     }
                 }

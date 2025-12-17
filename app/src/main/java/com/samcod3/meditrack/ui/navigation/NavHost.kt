@@ -8,10 +8,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.samcod3.meditrack.ui.screens.leaflet.LeafletScreen
 import com.samcod3.meditrack.ui.screens.profiles.ProfilesScreen
+import com.samcod3.meditrack.ui.screens.search.SearchScreen
 import com.samcod3.meditrack.ui.screens.scanner.ScannerScreen
 
 sealed class Screen(val route: String) {
     data object Profiles : Screen("profiles")
+    data object Search : Screen("search/{profileId}") {
+        fun createRoute(profileId: String) = "search/$profileId"
+    }
     data object Scanner : Screen("scanner/{profileId}") {
         fun createRoute(profileId: String) = "scanner/$profileId"
     }
@@ -36,6 +40,25 @@ fun MediTrackNavHost() {
             )
         }
         
+
+        
+        composable(
+            route = Screen.Search.route,
+            arguments = listOf(
+                navArgument("profileId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val profileId = backStackEntry.arguments?.getString("profileId") ?: ""
+            SearchScreen(
+                onBackClick = { navController.popBackStack() },
+                onMedicationClick = { medication ->
+                     if (!medication.nationalCode.isNullOrBlank()) {
+                         navController.navigate(Screen.Leaflet.createRoute(medication.nationalCode, profileId))
+                     }
+                }
+            )
+        }
+        
         composable(
             route = Screen.Scanner.route,
             arguments = listOf(
@@ -49,6 +72,9 @@ fun MediTrackNavHost() {
                         // Pop scanner so back button goes to dashboard (future) or profile
                         popUpTo(Screen.Scanner.route) { inclusive = true }
                     }
+                },
+                onSearchRequested = {
+                    navController.navigate(Screen.Search.createRoute(profileId))
                 }
             )
         }

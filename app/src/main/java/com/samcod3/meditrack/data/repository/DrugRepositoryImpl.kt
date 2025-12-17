@@ -408,6 +408,25 @@ class DrugRepositoryImpl(
          }
     }
 
+    override suspend fun searchMedications(query: String): Result<List<Medication>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Searching medications with query: $query")
+                val response = cimaApi.searchMedicationsByName(query)
+                
+                if (response.isSuccessful && response.body() != null) {
+                    val medications = response.body()!!.map { it.toDomain(null) }
+                    Result.success(medications)
+                } else {
+                    Result.failure(Exception("Error en la búsqueda (código: ${response.code()})"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error searching medications", e)
+                Result.failure(e)
+            }
+        }
+    }
+
     private fun MedicationDto.toDomain(nationalCode: String?): Medication {
         return Medication(
             registrationNumber = registrationNumber ?: "",

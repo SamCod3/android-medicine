@@ -3,6 +3,7 @@ package com.samcod3.meditrack.di
 import com.samcod3.meditrack.ui.screens.leaflet.LeafletViewModel
 import com.samcod3.meditrack.ui.screens.profiles.ProfileViewModel
 import com.samcod3.meditrack.ui.screens.scanner.ScannerViewModel
+import com.samcod3.meditrack.ui.screens.search.SearchViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
@@ -19,4 +20,5 @@ val appModule = module {
         ) 
     }
     viewModel { ProfileViewModel(get()) }
+    viewModel { SearchViewModel(get()) }
 }

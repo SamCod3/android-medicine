@@ -11,4 +11,5 @@ interface DrugRepository {
     @Deprecated("Use getLeaflet(medication)")
     suspend fun getLeaflet(registrationNumber: String): Result<Leaflet>
     suspend fun getLeafletSection(registrationNumber: String, section: Int): Result<LeafletSection?>
+    suspend fun searchMedications(query: String): Result<List<Medication>>
 }
