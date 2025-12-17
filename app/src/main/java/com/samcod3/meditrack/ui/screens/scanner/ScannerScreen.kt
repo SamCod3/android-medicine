@@ -558,24 +558,32 @@ private fun extractNationalCode(barcode: String): String {
         return extractFromGS1(cleanCode)
     }
     
-    // Check for special prefix 847000 (often used for non-standard or specific medication batches)
-    // Format: 847000 + CN(6 digits) + Check(1 digit)
+    // 1. Check for specific Health prefixes (NTIN) where CN is embedded
+    // Format: P(6) + CN(6) + DC(1)
+    
+    // Medicamentos (847000)
     if (cleanCode.startsWith("847000") && cleanCode.length == 13) {
         return cleanCode.substring(6, 12)
     }
 
-    // Check for EAN-13 (Spanish medications start with 84)
-    if (cleanCode.length == 13 && cleanCode.startsWith("84")) {
-        // Extract digits 3-8 (the national code portion, 6 digits) and remove leading zeros
-        return cleanCode.substring(2, 8).trimStart('0')
+    // Productos Sanitarios (848000)
+    if (cleanCode.startsWith("848000") && cleanCode.length == 13) {
+        return cleanCode.substring(6, 12)
     }
+
+    // 2. Generic EAN-13 (Spain 84) fallback
+    // WARNING: Commercial products (843, 841...) DO NOT have an embedded CN in fixed position.
+    // We strictly avoid extracting substrings for them to prevent false CNs.
     
-    // Check if it's already a plain national code (6-7 digits)
+    // Legacy support: Only if we are SURE it follows the old Short-CN pattern (rare now, usually wrapped in 847000)
+    // For now, we return the full code for non-847/848 prefixes to let the API handle "Not Found" cleanly.
+    
+    // Check if it's already a plain national code (6-7 digits) manually entered or recognized by OCR as such
     if (cleanCode.length in 6..7 && cleanCode.all { it.isDigit() }) {
         return cleanCode.trimStart('0')
     }
     
-    // Return as-is if format not recognized
+    // Return the full code (GTIN/EAN) for everything else
     return cleanCode
 }
 
@@ -588,16 +596,22 @@ private fun extractFromGS1(code: String): String {
         val gtin = code.substring(gtinStart + 2, gtinStart + 16)
         Log.d("Scanner", "GTIN: $gtin")
         
-        // Spanish pharma GTIN: 08470007058328
-        // National code is in positions 4-12 (9 digits), the last digit is check digit
-        if (gtin.startsWith("0847") || gtin.startsWith("847")) {
-            val cnStart = if (gtin.startsWith("0847")) 4 else 3
-            // Take 9 digits (positions 4-12), excluding the final check digit
-            val cnRaw = gtin.substring(cnStart, minOf(cnStart + 9, gtin.length - 1))
-            // Remove leading zeros to get the actual CN (usually 6-7 digits)
-            val cn = cnRaw.trimStart('0')
-            Log.d("Scanner", "Raw CN: $cnRaw, Extracted CN: $cn")
-            return cn
+        // Spanish NTIN (Medicines & Health Products)
+        // 847000xxxxxxC -> Medicines
+        // 848000xxxxxxC -> Health Products
+        if (gtin.startsWith("0847000") || gtin.startsWith("847000") || 
+            gtin.startsWith("0848000") || gtin.startsWith("848000")) {
+            
+            // Allow for 13 or 14 digit GTIN string inputs
+            val offset = if (gtin.length == 14) 7 else 6 
+            // The prefix is 847000/0847000 (length 6/7)
+            
+            // Extract the next 6 digits (CN)
+             if (gtin.length >= offset + 6) {
+                val cn = gtin.substring(offset, offset + 6)
+                Log.d("Scanner", "NTIN detected. Extracted CN: $cn")
+                return cn
+             }
         }
         
 
