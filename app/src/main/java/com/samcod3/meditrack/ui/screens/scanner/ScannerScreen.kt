@@ -560,8 +560,8 @@ private fun extractNationalCode(barcode: String): String {
     
     // Check for EAN-13 (Spanish medications start with 84)
     if (cleanCode.length == 13 && cleanCode.startsWith("84")) {
-        // Extract digits 3-9 (the national code portion) and remove leading zeros
-        return cleanCode.substring(2, 9).trimStart('0')
+        // Extract digits 3-8 (the national code portion, 6 digits) and remove leading zeros
+        return cleanCode.substring(2, 8).trimStart('0')
     }
     
     // Check if it's already a plain national code (6-7 digits)

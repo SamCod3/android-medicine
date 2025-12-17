@@ -42,6 +42,16 @@ class DrugRepositoryImpl(
                     val medication = response.body()!!.toDomain(nationalCode)
                     Result.success(medication)
                 } else {
+                    // Fallback: If CN has 7 digits (it might include the check digit), try with 6
+                    if (nationalCode.length == 7) {
+                         val cn6 = nationalCode.substring(0, 6)
+                         Log.d(TAG, "7-digit CN failed, retrying with 6 digits: $cn6")
+                         val retryResponse = cimaApi.getMedicationByNationalCode(cn6)
+                         if (retryResponse.isSuccessful && retryResponse.body() != null) {
+                             val medication = retryResponse.body()!!.toDomain(cn6)
+                             return@withContext Result.success(medication)
+                         }
+                    }
                     Result.failure(Exception("Medicamento no encontrado (código: ${response.code()})"))
                 }
             } catch (e: Exception) {
