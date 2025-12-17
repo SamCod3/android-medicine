@@ -3,6 +3,7 @@ package com.samcod3.meditrack.data.repository
 import android.util.Log
 import com.samcod3.meditrack.data.remote.api.CimaApiService
 import com.samcod3.meditrack.data.remote.dto.MedicationDto
+import com.samcod3.meditrack.data.remote.dto.SearchResponseDto
 import com.samcod3.meditrack.domain.model.ActiveIngredient
 import com.samcod3.meditrack.domain.model.Leaflet
 import com.samcod3.meditrack.domain.model.LeafletSection
@@ -415,7 +416,8 @@ class DrugRepositoryImpl(
                 val response = cimaApi.searchMedicationsByName(query)
                 
                 if (response.isSuccessful && response.body() != null) {
-                    val medications = response.body()!!.map { it.toDomain(null) }
+                    val searchResponse = response.body()!!
+                    val medications = searchResponse.results?.map { it.toDomain(null) } ?: emptyList()
                     Result.success(medications)
                 } else {
                     Result.failure(Exception("Error en la búsqueda (código: ${response.code()})"))
