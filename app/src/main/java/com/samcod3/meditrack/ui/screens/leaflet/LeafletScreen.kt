@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Warning
@@ -31,6 +32,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,10 +70,19 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun LeafletScreen(
     nationalCode: String,
+    profileId: String,
     onNavigateBack: () -> Unit,
-    viewModel: LeafletViewModel = koinViewModel { parametersOf(nationalCode) }
+    onMedicationSaved: () -> Unit,
+    viewModel: LeafletViewModel = koinViewModel { parametersOf(nationalCode, profileId) }
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    
+    // Handle save success
+    LaunchedEffect(uiState.saveSuccess) {
+        if (uiState.saveSuccess) {
+            onMedicationSaved()
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -95,14 +107,27 @@ fun LeafletScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
+        },
+        floatingActionButton = {
+            if (!uiState.isLoading && uiState.medication != null) {
+                ExtendedFloatingActionButton(
+                    text = { Text("Guardar en Botiquín") },
+                    icon = { Icon(Icons.Default.BookmarkAdd, contentDescription = null) },
+                    onClick = { viewModel.saveMedication() },
+                    expanded = !uiState.isSaving,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
     ) { paddingValues ->
         when {
-            uiState.isLoading -> {
+            uiState.isLoading || uiState.isSaving -> {
                 LoadingState(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(paddingValues)
+                        .padding(paddingValues),
+                    message = if (uiState.isSaving) "Guardando..." else stringResource(R.string.leaflet_loading)
                 )
             }
             uiState.error != null -> {
@@ -179,9 +204,9 @@ private fun LeafletContent(
                     )
                 }
                 
-                // Bottom spacing
+                // Bottom spacing for FAB
                 item {
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(80.dp))
                 }
             }
         }
@@ -429,7 +454,8 @@ private fun SectionCard(
 
 @Composable
 private fun LoadingState(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    message: String = stringResource(R.string.leaflet_loading)
 ) {
     Box(
         modifier = modifier,
@@ -441,7 +467,7 @@ private fun LoadingState(
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = stringResource(R.string.leaflet_loading),
+                text = message,
                 style = MaterialTheme.typography.bodyMedium
             )
         }

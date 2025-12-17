@@ -12,9 +12,11 @@ import com.samcod3.meditrack.ui.screens.scanner.ScannerScreen
 
 sealed class Screen(val route: String) {
     data object Profiles : Screen("profiles")
-    data object Scanner : Screen("scanner")
-    data object Leaflet : Screen("leaflet/{nationalCode}") {
-        fun createRoute(nationalCode: String) = "leaflet/$nationalCode"
+    data object Scanner : Screen("scanner/{profileId}") {
+        fun createRoute(profileId: String) = "scanner/$profileId"
+    }
+    data object Leaflet : Screen("leaflet/{nationalCode}/{profileId}") {
+        fun createRoute(nationalCode: String, profileId: String) = "leaflet/$nationalCode/$profileId"
     }
 }
 
@@ -29,16 +31,24 @@ fun MediTrackNavHost() {
         composable(Screen.Profiles.route) {
             ProfilesScreen(
                 onProfileSelected = { profileId ->
-                    // Navigate to Scanner (future: Dashboard/Medication List)
-                    navController.navigate(Screen.Scanner.route)
+                    navController.navigate(Screen.Scanner.createRoute(profileId))
                 }
             )
         }
         
-        composable(Screen.Scanner.route) {
+        composable(
+            route = Screen.Scanner.route,
+            arguments = listOf(
+                navArgument("profileId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val profileId = backStackEntry.arguments?.getString("profileId") ?: ""
             ScannerScreen(
                 onMedicationScanned = { nationalCode ->
-                    navController.navigate(Screen.Leaflet.createRoute(nationalCode))
+                    navController.navigate(Screen.Leaflet.createRoute(nationalCode, profileId)) {
+                        // Pop scanner so back button goes to dashboard (future) or profile
+                        popUpTo(Screen.Scanner.route) { inclusive = true }
+                    }
                 }
             )
         }
@@ -46,13 +56,24 @@ fun MediTrackNavHost() {
         composable(
             route = Screen.Leaflet.route,
             arguments = listOf(
-                navArgument("nationalCode") { type = NavType.StringType }
+                navArgument("nationalCode") { type = NavType.StringType },
+                navArgument("profileId") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val nationalCode = backStackEntry.arguments?.getString("nationalCode") ?: ""
+            val profileId = backStackEntry.arguments?.getString("profileId") ?: ""
+            
             LeafletScreen(
                 nationalCode = nationalCode,
-                onNavigateBack = { navController.popBackStack() }
+                profileId = profileId,
+                onNavigateBack = { navController.popBackStack() },
+                onMedicationSaved = {
+                    // Navigate back to Profiles (or Dashboard in future)
+                    // Clear back stack to avoid loops
+                    navController.navigate(Screen.Profiles.route) {
+                        popUpTo(Screen.Profiles.route) { inclusive = true }
+                    }
+                }
             )
         }
     }

@@ -5,7 +5,9 @@ import com.samcod3.meditrack.data.local.db.MediTrackDatabase
 import com.samcod3.meditrack.data.repository.DrugRepository
 import com.samcod3.meditrack.data.repository.DrugRepositoryImpl
 import com.samcod3.meditrack.data.repository.ProfileRepositoryImpl
+import com.samcod3.meditrack.data.repository.UserMedicationRepositoryImpl
 import com.samcod3.meditrack.domain.repository.ProfileRepository
+import com.samcod3.meditrack.domain.repository.UserMedicationRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
@@ -23,8 +25,10 @@ val dataModule = module {
     
     // DAOs
     single { get<MediTrackDatabase>().profileDao }
+    single { get<MediTrackDatabase>().medicationDao }
     
     // Repositories
     single<DrugRepository> { DrugRepositoryImpl(get()) }
     single<ProfileRepository> { ProfileRepositoryImpl(get()) }
+    single<UserMedicationRepository> { UserMedicationRepositoryImpl(get()) }
 }

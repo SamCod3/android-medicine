@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.samcod3.meditrack.data.repository.DrugRepository
 import com.samcod3.meditrack.domain.model.LeafletSection
 import com.samcod3.meditrack.domain.model.Medication
+import com.samcod3.meditrack.domain.repository.UserMedicationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,13 +15,16 @@ data class LeafletUiState(
     val isLoading: Boolean = true,
     val medication: Medication? = null,
     val sections: List<LeafletSection> = emptyList(),
-    val selectedSectionIndex: Int = 0,
-    val error: String? = null
+    val error: String? = null,
+    val isSaving: Boolean = false,
+    val saveSuccess: Boolean = false
 )
 
 class LeafletViewModel(
     private val nationalCode: String,
-    private val drugRepository: DrugRepository
+    private val profileId: String,
+    private val drugRepository: DrugRepository,
+    private val userMedicationRepository: UserMedicationRepository
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(LeafletUiState())
@@ -65,8 +69,29 @@ class LeafletViewModel(
         }
     }
     
-    fun selectSection(index: Int) {
-        _uiState.value = _uiState.value.copy(selectedSectionIndex = index)
+    fun saveMedication() {
+        val medication = _uiState.value.medication ?: return
+        
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSaving = true)
+            
+            val result = userMedicationRepository.saveMedication(
+                profileId = profileId,
+                nationalCode = nationalCode,
+                name = medication.name,
+                description = medication.activeIngredients.joinToString(", ") { "${it.name} ${it.quantity}${it.unit}" },
+                notes = null
+            )
+            
+            if (result.isSuccess) {
+                _uiState.value = _uiState.value.copy(isSaving = false, saveSuccess = true)
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isSaving = false,
+                    error = "Error al guardar: ${result.exceptionOrNull()?.message}"
+                )
+            }
+        }
     }
     
     fun retry() {
