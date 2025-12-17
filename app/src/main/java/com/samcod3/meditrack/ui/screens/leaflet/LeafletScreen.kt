@@ -172,8 +172,7 @@ private fun LeafletContent(
             )
         }
         
-        // Section dropdown navigator
-        if (sections.isNotEmpty()) {
+                if (sections.isNotEmpty()) {
             SectionDropdown(
                 sections = sections,
                 onSectionSelected = { index ->
@@ -207,6 +206,51 @@ private fun LeafletContent(
                 // Bottom spacing for FAB
                 item {
                     Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+        } else {
+            // Fallback for when segmented content is not available
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "No se pudo cargar el formato de lectura rápida.",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "El prospecto no está disponible por secciones.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                
+                if (!medication?.leafletUrl.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = { 
+                            try {
+                                uriHandler.openUri(medication!!.leafletUrl!!) 
+                            } catch (e: Exception) {
+                                // Ignore
+                            }
+                        }
+                    ) {
+                        Text("Ver Prospecto Oficial (Web)")
+                    }
                 }
             }
         }
