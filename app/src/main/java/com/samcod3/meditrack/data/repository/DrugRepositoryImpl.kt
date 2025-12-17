@@ -196,7 +196,9 @@ class DrugRepositoryImpl(
         var currentTitle = ""
         var currentContent = StringBuilder()
         
-        val elements = container.select("p, div, h1, h2, h3, h4, h5, h6, li, strong, b")
+        // Iterate over all semantic block elements + strong/bold/span
+        // We use 'select' to get flat list of relevant elements in order
+        val elements = container.select("p, div, h1, h2, h3, h4, h5, h6, header, li, strong, b, span")
         
         for (element in elements) {
             val text = element.text().trim()
