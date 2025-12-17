@@ -107,7 +107,9 @@ private fun CameraPreview(
                 Barcode.FORMAT_EAN_13,
                 Barcode.FORMAT_EAN_8,
                 Barcode.FORMAT_CODE_128,
-                Barcode.FORMAT_CODE_39
+                Barcode.FORMAT_CODE_39,
+                Barcode.FORMAT_DATA_MATRIX,  // DataMatrix for Spanish medications
+                Barcode.FORMAT_QR_CODE
             )
             .build()
         BarcodeScanning.getClient(options)
@@ -182,16 +184,70 @@ private fun CameraPreview(
     )
 }
 
+/**
+ * Extracts the national code (CN) from various barcode formats used in Spanish medications.
+ * 
+ * Supported formats:
+ * - EAN-13: 84XXXXXXXC (Spanish prefix 84, CN is digits 3-9)
+ * - GS1 DataMatrix: (01)GTIN(17)YYMMDD(10)LOT(21)SN - CN is in GTIN
+ * - Plain national code
+ */
 private fun extractNationalCode(barcode: String): String {
-    // Spanish medication barcodes (EAN-13) contain the national code
-    // Format: 84XXXXXXXC where X is the CN and C is check digit
-    // The CN is typically 6-7 digits
-    return if (barcode.length == 13 && barcode.startsWith("84")) {
-        // Extract digits 3-9 (the national code portion)
-        barcode.substring(2, 9).trimStart('0')
-    } else {
-        barcode
+    // Clean up the barcode (remove FNC1 characters and whitespace)
+    val cleanCode = barcode.replace("\u001D", "").replace("\\s".toRegex(), "")
+    
+    // Check for GS1 DataMatrix format (starts with 01 for GTIN)
+    if (cleanCode.startsWith("01") && cleanCode.length >= 16) {
+        return extractFromGS1(cleanCode)
     }
+    
+    // Check for EAN-13 (Spanish medications start with 84)
+    if (cleanCode.length == 13 && cleanCode.startsWith("84")) {
+        // Extract digits 3-9 (the national code portion) and remove leading zeros
+        return cleanCode.substring(2, 9).trimStart('0')
+    }
+    
+    // Check if it's already a plain national code (6-7 digits)
+    if (cleanCode.length in 6..7 && cleanCode.all { it.isDigit() }) {
+        return cleanCode.trimStart('0')
+    }
+    
+    // Return as-is if format not recognized
+    return cleanCode
+}
+
+/**
+ * Extracts national code from GS1-128 or GS1 DataMatrix format.
+ * Format: (01)GTIN(17)EXPIRY(10)LOT(21)SERIAL
+ * 
+ * GTIN for Spanish meds: 08471234567890 where:
+ * - 0847 = GS1 Spain prefix for pharma
+ * - 1234567 = National Code (CN)
+ * - 890 = packaging + check digit
+ */
+private fun extractFromGS1(code: String): String {
+    // AI 01 = GTIN (14 digits)
+    val gtinStart = code.indexOf("01")
+    if (gtinStart != -1 && code.length >= gtinStart + 16) {
+        val gtin = code.substring(gtinStart + 2, gtinStart + 16)
+        
+        // Spanish pharma GTIN: 08471234567XXX
+        // National code is positions 4-10 (7 digits)
+        if (gtin.startsWith("0847") || gtin.startsWith("847")) {
+            val cnStart = if (gtin.startsWith("0847")) 4 else 3
+            val cn = gtin.substring(cnStart, minOf(cnStart + 7, gtin.length))
+            return cn.trimStart('0')
+        }
+        
+        // Alternative: 84XXXXXXXXXX format
+        if (gtin.contains("84")) {
+            val idx84 = gtin.indexOf("84")
+            val cn = gtin.substring(idx84 + 2, minOf(idx84 + 9, gtin.length))
+            return cn.trimStart('0')
+        }
+    }
+    
+    return code
 }
 
 @Composable
