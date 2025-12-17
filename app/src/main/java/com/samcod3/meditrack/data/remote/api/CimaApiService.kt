@@ -2,6 +2,7 @@ package com.samcod3.meditrack.data.remote.api
 
 import com.samcod3.meditrack.data.remote.dto.MedicationDto
 import com.samcod3.meditrack.data.remote.dto.LeafletSectionDto
+import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -14,7 +15,7 @@ interface CimaApiService {
     @GET("medicamento")
     suspend fun getMedicationByNationalCode(
         @Query("cn") nationalCode: String
-    ): MedicationDto?
+    ): Response<MedicationDto>
     
     /**
      * Search medications by name
@@ -22,7 +23,7 @@ interface CimaApiService {
     @GET("medicamentos")
     suspend fun searchMedicationsByName(
         @Query("nombre") name: String
-    ): List<MedicationDto>
+    ): Response<List<MedicationDto>>
     
     /**
      * Get leaflet section content by registration number
@@ -33,5 +34,6 @@ interface CimaApiService {
     suspend fun getLeafletSection(
         @Query("nregistro") registrationNumber: String,
         @Query("seccion") section: Int
-    ): LeafletSectionDto?
+    ): Response<LeafletSectionDto>
 }
+

@@ -2,6 +2,7 @@ package com.samcod3.meditrack.ui.screens.scanner
 
 import android.Manifest
 import android.util.Log
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -16,10 +17,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material3.Button
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -29,7 +34,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +67,8 @@ fun ScannerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
+    var isFlashOn by remember { mutableStateOf(false) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
     
     LaunchedEffect(uiState.scannedCode) {
         uiState.scannedCode?.let { code ->
@@ -78,11 +87,43 @@ fun ScannerScreen(
                 CameraPreview(
                     onBarcodeDetected = { barcode ->
                         viewModel.onBarcodeScanned(barcode)
+                    },
+                    onCameraReady = { cam ->
+                        camera = cam
                     }
                 )
                 
                 // Scan overlay
                 ScanOverlay()
+                
+                // Flashlight button
+                FloatingActionButton(
+                    onClick = {
+                        camera?.let { cam ->
+                            if (cam.cameraInfo.hasFlashUnit()) {
+                                isFlashOn = !isFlashOn
+                                cam.cameraControl.enableTorch(isFlashOn)
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(24.dp),
+                    containerColor = if (isFlashOn) 
+                        MaterialTheme.colorScheme.primaryContainer 
+                    else 
+                        MaterialTheme.colorScheme.surface,
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        imageVector = if (isFlashOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                        contentDescription = if (isFlashOn) "Apagar linterna" else "Encender linterna",
+                        tint = if (isFlashOn)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurface
+                    )
+                }
             } else {
                 PermissionRequest(
                     onRequestPermission = { cameraPermission.launchPermissionRequest() }
@@ -94,7 +135,8 @@ fun ScannerScreen(
 
 @Composable
 private fun CameraPreview(
-    onBarcodeDetected: (String) -> Unit
+    onBarcodeDetected: (String) -> Unit,
+    onCameraReady: (Camera) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -147,9 +189,10 @@ private fun CameraPreview(
                             barcodeScanner.process(inputImage)
                                 .addOnSuccessListener { barcodes ->
                                     barcodes.firstOrNull()?.rawValue?.let { code ->
+                                        Log.d("Scanner", "Raw barcode: $code")
                                         // Extract national code from barcode
-                                        // Spanish medication barcodes typically have the CN in EAN-13 format
                                         val nationalCode = extractNationalCode(code)
+                                        Log.d("Scanner", "Extracted CN: $nationalCode")
                                         onBarcodeDetected(nationalCode)
                                     }
                                 }
@@ -166,12 +209,13 @@ private fun CameraPreview(
             
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                val camera = cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,
                     preview,
                     imageAnalysis
                 )
+                onCameraReady(camera)
             } catch (e: Exception) {
                 Log.e("ScannerScreen", "Camera binding failed", e)
             }
@@ -195,6 +239,8 @@ private fun CameraPreview(
 private fun extractNationalCode(barcode: String): String {
     // Clean up the barcode (remove FNC1 characters and whitespace)
     val cleanCode = barcode.replace("\u001D", "").replace("\\s".toRegex(), "")
+    
+    Log.d("Scanner", "Clean code: $cleanCode (length: ${cleanCode.length})")
     
     // Check for GS1 DataMatrix format (starts with 01 for GTIN)
     if (cleanCode.startsWith("01") && cleanCode.length >= 16) {
@@ -226,16 +272,20 @@ private fun extractNationalCode(barcode: String): String {
  * - 890 = packaging + check digit
  */
 private fun extractFromGS1(code: String): String {
+    Log.d("Scanner", "Parsing GS1: $code")
+    
     // AI 01 = GTIN (14 digits)
     val gtinStart = code.indexOf("01")
     if (gtinStart != -1 && code.length >= gtinStart + 16) {
         val gtin = code.substring(gtinStart + 2, gtinStart + 16)
+        Log.d("Scanner", "GTIN: $gtin")
         
         // Spanish pharma GTIN: 08471234567XXX
         // National code is positions 4-10 (7 digits)
         if (gtin.startsWith("0847") || gtin.startsWith("847")) {
             val cnStart = if (gtin.startsWith("0847")) 4 else 3
             val cn = gtin.substring(cnStart, minOf(cnStart + 7, gtin.length))
+            Log.d("Scanner", "Extracted CN from GTIN: $cn")
             return cn.trimStart('0')
         }
         
@@ -243,6 +293,7 @@ private fun extractFromGS1(code: String): String {
         if (gtin.contains("84")) {
             val idx84 = gtin.indexOf("84")
             val cn = gtin.substring(idx84 + 2, minOf(idx84 + 9, gtin.length))
+            Log.d("Scanner", "Extracted CN (alt): $cn")
             return cn.trimStart('0')
         }
     }
