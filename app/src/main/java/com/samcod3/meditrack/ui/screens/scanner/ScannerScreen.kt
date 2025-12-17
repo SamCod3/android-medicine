@@ -181,29 +181,35 @@ fun ScannerScreen(
                                     onClick = {
                                         if (!isProcessingText && imageCapture != null) {
                                             isProcessingText = true
-                                            captureAndProcessText(
-                                                imageCapture!!,
-                                                context
-                                            ) { resultCN ->
-                                                isProcessingText = false
-                                                if (resultCN != null) {
-                                                    onMedicationScanned(resultCN)
-                                                } else {
-                                                    Toast.makeText(context, "No se encontró CN válido", Toast.LENGTH_SHORT).show()
-                                                }
+                                    captureAndProcessText(
+                                        imageCapture!!,
+                                        context
+                                    ) { resultCN, recognizedText ->
+                                        isProcessingText = false
+                                        if (resultCN != null) {
+                                            onMedicationScanned(resultCN)
+                                        } else {
+                                            // Check if we found "SN" or "Serial" but no CN
+                                            if (recognizedText?.contains("SN", ignoreCase = true) == true || 
+                                                recognizedText?.contains("Serial", ignoreCase = true) == true) {
+                                                Toast.makeText(context, "Has escaneado el Nº de Serie. Busca el código CN o PC", Toast.LENGTH_LONG).show()
+                                            } else {
+                                                Toast.makeText(context, "No se encontró CN válido. Prueba la búsqueda manual", Toast.LENGTH_SHORT).show()
                                             }
                                         }
-                                    },
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    shape = CircleShape,
-                                    modifier = Modifier.size(72.dp)
-                                ) {
-                                    if (isProcessingText) {
-                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp))
-                                    } else {
-                                        Icon(Icons.Default.CameraAlt, contentDescription = "Capturar", modifier = Modifier.size(32.dp))
                                     }
                                 }
+                            },
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            shape = CircleShape,
+                            modifier = Modifier.size(72.dp)
+                        ) {
+                            if (isProcessingText) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp))
+                            } else {
+                                Icon(Icons.Default.CameraAlt, contentDescription = "Capturar", modifier = Modifier.size(32.dp))
+                            }
+                        }
                             } else {
                                 Spacer(modifier = Modifier.size(56.dp))
                             }
@@ -279,7 +285,7 @@ fun ModeButton(icon: androidx.compose.ui.graphics.vector.ImageVector, text: Stri
 private fun captureAndProcessText(
     imageCapture: ImageCapture,
     context: Context,
-    onResult: (String?) -> Unit
+    onResult: (String?, String?) -> Unit
 ) {
     imageCapture.takePicture(
         ContextCompat.getMainExecutor(context),
@@ -293,24 +299,24 @@ private fun captureAndProcessText(
                     recognizer.process(inputImage)
                         .addOnSuccessListener { visionText ->
                             val foundCN = findCNInText(visionText.text)
-                            onResult(foundCN)
+                            onResult(foundCN, visionText.text)
                         }
                         .addOnFailureListener { e ->
                             Log.e("ScannerOCR", "Text recognition failed", e)
-                            onResult(null)
+                            onResult(null, null)
                         }
                         .addOnCompleteListener {
                             imageProxy.close()
                         }
                 } else {
                     imageProxy.close()
-                    onResult(null)
+                    onResult(null, null)
                 }
             }
             
             override fun onError(exception: ImageCaptureException) {
                 Log.e("ScannerOCR", "Photo capture failed", exception)
-                onResult(null)
+                onResult(null, null)
             }
         }
     )
