@@ -600,15 +600,7 @@ private fun extractFromGS1(code: String): String {
             return cn
         }
         
-        // Alternative: look for 84 pattern anywhere in GTIN
-        if (gtin.contains("84")) {
-            val idx84 = gtin.indexOf("84")
-            // After 84, take up to 9 digits (before check digit)
-            val cnRaw = gtin.substring(idx84 + 2, minOf(idx84 + 11, gtin.length - 1))
-            val cn = cnRaw.trimStart('0')
-            Log.d("Scanner", "Alt Raw CN: $cnRaw, Extracted CN: $cn")
-            return cn
-        }
+
     }
     
     return code
