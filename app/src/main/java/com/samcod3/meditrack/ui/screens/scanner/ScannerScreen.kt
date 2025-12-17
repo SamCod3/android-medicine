@@ -294,19 +294,39 @@ private fun captureAndProcessText(
                 val mediaImage = imageProxy.image
                 if (mediaImage != null) {
                     val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                     
-                    recognizer.process(inputImage)
-                        .addOnSuccessListener { visionText ->
-                            val foundCN = findCNInText(visionText.text)
-                            onResult(foundCN, visionText.text)
+                    // 1. Try Barcode Scanning First (on the high-res image)
+                    val barcodeOptions = BarcodeScannerOptions.Builder()
+                        .setBarcodeFormats(
+                            Barcode.FORMAT_EAN_13,
+                            Barcode.FORMAT_EAN_8,
+                            Barcode.FORMAT_DATA_MATRIX,
+                            Barcode.FORMAT_QR_CODE
+                        )
+                        .build()
+                    val barcodeScanner = BarcodeScanning.getClient(barcodeOptions)
+                    
+                    barcodeScanner.process(inputImage)
+                        .addOnSuccessListener { barcodes ->
+                            val foundBarcode = barcodes.firstOrNull()?.rawValue
+                            if (!foundBarcode.isNullOrBlank()) {
+                                // Success! We found a barcode in the static image
+                                val cn = extractNationalCode(foundBarcode)
+                                Log.d("ScannerHybrid", "Barcode found in static image: $cn")
+                                onResult(cn, null)
+                                imageProxy.close()
+                                barcodeScanner.close()
+                            } else {
+                                // No barcode found, proceed to Text OCR
+                                processTextOcr(inputImage, imageProxy, onResult)
+                                barcodeScanner.close()
+                            }
                         }
                         .addOnFailureListener { e ->
-                            Log.e("ScannerOCR", "Text recognition failed", e)
-                            onResult(null, null)
-                        }
-                        .addOnCompleteListener {
-                            imageProxy.close()
+                            Log.e("ScannerHybrid", "Static barcode scan failed", e)
+                            // Fallback to Text OCR
+                            processTextOcr(inputImage, imageProxy, onResult)
+                            barcodeScanner.close()
                         }
                 } else {
                     imageProxy.close()
@@ -315,11 +335,33 @@ private fun captureAndProcessText(
             }
             
             override fun onError(exception: ImageCaptureException) {
-                Log.e("ScannerOCR", "Photo capture failed", exception)
+                Log.e("ScannerHybrid", "Photo capture failed", exception)
                 onResult(null, null)
             }
         }
     )
+}
+
+private fun processTextOcr(
+    inputImage: InputImage,
+    imageProxy: ImageProxy,
+    onResult: (String?, String?) -> Unit
+) {
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    recognizer.process(inputImage)
+        .addOnSuccessListener { visionText ->
+            val foundCN = findCNInText(visionText.text)
+            Log.d("ScannerHybrid", "OCR Result: $foundCN")
+            onResult(foundCN, visionText.text)
+        }
+        .addOnFailureListener { e ->
+            Log.e("ScannerHybrid", "Text recognition failed", e)
+            onResult(null, null)
+        }
+        .addOnCompleteListener {
+            imageProxy.close()
+            recognizer.close()
+        }
 }
 
 private fun findCNInText(text: String): String? {
