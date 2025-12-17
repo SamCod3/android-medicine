@@ -26,7 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -70,6 +70,8 @@ import com.samcod3.meditrack.domain.model.Reminder
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 import kotlin.math.roundToInt
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -271,14 +273,31 @@ private fun ReminderDialog(
     var expandedType by remember { mutableStateOf(false) }
     var expandedPortion by remember { mutableStateOf(false) }
     
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxWidth(0.95f),
-        title = { Text(if (isEditing) "Editar recordatorio" else "Nuevo recordatorio") },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .padding(16.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = AlertDialogDefaults.TonalElevation
+        ) {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
+                // Title
+                Text(
+                    text = if (isEditing) "Editar recordatorio" else "Nuevo recordatorio",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 // Time picker
                 TimePicker(state = timePickerState)
                 
@@ -442,33 +461,39 @@ private fun ReminderDialog(
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val qty = quantity.toIntOrNull() ?: 1
-                val portion = if (selectedDosageType == DosageType.PORCION) selectedPortion else null
-                onConfirm(
-                    timePickerState.hour,
-                    timePickerState.minute,
-                    selectedScheduleType,
-                    selectedDays,
-                    intervalDaysValue.roundToInt(),
-                    dayOfMonthValue.roundToInt(),
-                    qty,
-                    selectedDosageType,
-                    portion
-                )
-            }) {
-                Text("Guardar")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancelar")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = {
+                        val qty = quantity.toIntOrNull() ?: 1
+                        val portion = if (selectedDosageType == DosageType.PORCION) selectedPortion else null
+                        onConfirm(
+                            timePickerState.hour,
+                            timePickerState.minute,
+                            selectedScheduleType,
+                            selectedDays,
+                            intervalDaysValue.roundToInt(),
+                            dayOfMonthValue.roundToInt(),
+                            qty,
+                            selectedDosageType,
+                            portion
+                        )
+                    }) {
+                        Text("Guardar")
+                    }
+                }
             }
         }
-    )
+    }
 }
 
 @Composable
