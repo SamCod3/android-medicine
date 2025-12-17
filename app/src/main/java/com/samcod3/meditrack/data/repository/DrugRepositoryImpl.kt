@@ -114,80 +114,102 @@ class DrugRepositoryImpl(
         val doc = Jsoup.parse(html)
         val sections = mutableListOf<LeafletSection>()
         
-        // Find body content
-        val body = doc.body()
+        // Find body - usually inside a container with class 'texto_prospecto' or just body
+        val container = doc.select(".texto_prospecto").first() ?: doc.body()
         
-        // Strategy: Find standard headers and split content
-        // CIMA HTMLs often structure sections with <p class="epigrafe"> or <strong> or <h3>
-        // We look for elements starting with "1. ", "2. ", etc.
+        // Regex to match section headers: "1. Title", "1.- Title", "1 . Title"
+        // Also captures the number (group 1) and title (group 2)
+        val headerRegex = Regex("""^([1-6])[\s\.\-\)]+(.*)""")
         
-        val elements = body.allElements
         var currentSectionNum = 0
         var currentTitle = ""
         var currentContent = StringBuilder()
         
+        // Iterate over all semantic block elements + strong/bold
+        // We use 'select' to get flat list of relevant elements in order
+        val elements = container.select("p, div, h1, h2, h3, h4, h5, h6, li, strong, b")
+        
         for (element in elements) {
-            val text = element.ownText().trim()
-            val isHeader = SECTION_PREFIXES.any { prefix -> text.startsWith(prefix, ignoreCase = true) }
+            val text = element.text().trim()
+            if (text.isBlank()) continue
             
-            // Heuristic for header: starts with "X. ", short length, usually strong or p class=epigrafe
-            val nextSectionNum = getSectionNumber(text)
-            
-            if (nextSectionNum != null && nextSectionNum > currentSectionNum) {
-                // Save previous section
-                if (currentSectionNum > 0) {
-                    sections.add(
-                        LeafletSection(
-                            number = currentSectionNum,
-                            title = currentTitle,
-                            content = currentContent.toString()
-                        )
-                    )
-                }
-                
-                // Start new section
-                currentSectionNum = nextSectionNum
-                currentTitle = text
-                currentContent = StringBuilder()
-                // Don't add the header itself to content, or maybe add it as h3?
-                // Let's not add it to content to avoid duplication if we use title separately
-            } else if (currentSectionNum > 0) {
-                // Append content to current section, preserving basic HTML structure
-                // We append the outerHtml of relevant block elements
-                // BUT: allowElements iterates EVERYTHING (parents and children). We prefer direct children of body or main container.
-                // This 'allElements' loop is too granular and will duplicate content.
-                // Better strategy: Iterate direct children of main container.
+            // Optimization: Skip very long texts checking for header, headers are short
+            if (text.length > 200) {
+                 if (currentSectionNum > 0) currentContent.append("<p>${element.html()}</p>")
+                 continue
             }
-        }
-        
-        // BETTER STRATEGY: Iterate direct children
-        sections.clear()
-        currentSectionNum = 0
-        currentContent = StringBuilder()
-        
-        // Find the main container (usually just body or a div with class 'texto_prospecto' or similar)
-        // CIMA structure varies, traversing body children is safest generic approach
-        val children = body.children()
-        
-        for (child in children) {
-            val text = child.text().trim()
-            val nextSectionNum = getSectionNumber(text)
             
-            if (nextSectionNum != null && nextSectionNum > currentSectionNum) {
-                 if (currentSectionNum > 0) {
+            // Check if this element is a Header
+            val match = headerRegex.find(text)
+            var foundSectionNum: Int? = null
+            
+            if (match != null) {
+                try {
+                    val num = match.groupValues[1].toInt()
+                    val titlePart = match.groupValues[2].lowercase()
+                    
+                    // Validate keywords to ensure it's a real section header and not just "1.5 mg"
+                    val isValid = when (num) {
+                        1 -> titlePart.contains("qué es") || titlePart.contains("que es")
+                        2 -> titlePart.contains("necesita saber") || titlePart.contains("antes de") || titlePart.contains("tenga cuidado")
+                        3 -> titlePart.contains("cómo") || titlePart.contains("como") || titlePart.contains("usar")
+                        4 -> titlePart.contains("efectos") || titlePart.contains("adversos")
+                        5 -> titlePart.contains("conservación") || titlePart.contains("conservacion")
+                        6 -> titlePart.contains("contenido") || titlePart.contains("envase") || titlePart.contains("información")
+                        else -> false
+                    }
+                    
+                    if (isValid) {
+                        foundSectionNum = num
+                        // Use the full original text as title
+                        currentTitle = text
+                    }
+                } catch (e: Exception) {
+                    // Ignore parsing error
+                }
+            }
+            
+            if (foundSectionNum != null && foundSectionNum > currentSectionNum) {
+                 // Save previous section
+                if (currentSectionNum > 0) {
                     sections.add(
                         LeafletSection(number = currentSectionNum, title = currentTitle, content = currentContent.toString())
                     )
                 }
-                currentSectionNum = nextSectionNum
-                currentTitle = text
+                
+                // Start new section
+                currentSectionNum = foundSectionNum!!
                 currentContent = StringBuilder()
+                // We don't add the header itself to content
             } else if (currentSectionNum > 0) {
-                currentContent.append(child.outerHtml())
+                // Append content. 
+                // Only append if it's not nested inside another element we already processed.
+                // But Jsoup select returns flat list. 
+                // Issue: If we select 'div' and also 'p' inside it, we get duplication.
+                // Simple fix: Append unique content or just use paragraph tags.
+                // To be safe and simple: Append element's outerHtml IF it's a paragraph or list item.
+                // If it's a strong/b inside a p, the p will catch it.
+                // So we should iterate DIRECT CHILDREN of container for content, searching recursively for headers? No, CIMA is flat usually.
+                
+                // Let's rely on 'p' and 'li' for content.
+                if (element.tagName() in listOf("p", "li", "div")) {
+                     currentContent.append(element.outerHtml())
+                }
             }
         }
         
-        // Add last section
+        // If "flat" iteration failed (maybe structure is nested weirdly), try Child Traversal
+        if (sections.isEmpty() || currentSectionNum == 0) {
+             val children = container.children()
+             for (child in children) {
+                 val text = child.text().trim()
+                 val match = headerRegex.find(text)
+                 // ... same logic ...
+                 // This duplicates logic. Let's stick to the Select approach but filter "block" tags only.
+             }
+        }
+        
+        // Save last section
         if (currentSectionNum > 0) {
             sections.add(
                 LeafletSection(number = currentSectionNum, title = currentTitle, content = currentContent.toString())
@@ -197,23 +219,9 @@ class DrugRepositoryImpl(
         return sections
     }
     
-    private fun getSectionNumber(text: String): Int? {
-        if (text.length > 100) return null // Headers aren't huge paragraphs
-        
-        for (i in 1..6) {
-            if (text.startsWith("$i. ") || text.startsWith("$i.- ") || text.startsWith("$i ")) {
-                // Verify it matches expected keywords to avoid false positives (e.g. "1.5 mg")
-                val lower = text.lowercase()
-                if (i == 1 && lower.contains("qué es")) return 1
-                if (i == 2 && (lower.contains("necesita saber") || lower.contains("antes de"))) return 2
-                if (i == 3 && (lower.contains("cómo") || lower.contains("tomar") || lower.contains("usar"))) return 3
-                if (i == 4 && (lower.contains("efectos") || lower.contains("adversos"))) return 4
-                if (i == 5 && lower.contains("conservación")) return 5
-                if (i == 6 && (lower.contains("contenido") || lower.contains("envase"))) return 6
-            }
-        }
-        return null
-    }
+    // Helper not needed anymore inside parseHtmlLeaflet
+    private fun getSectionNumber(text: String): Int? { return null } // Deprecated helper placeholder
+
 
     override suspend fun getLeafletSection(registrationNumber: String, section: Int): Result<LeafletSection?> {
         // ... same as before
