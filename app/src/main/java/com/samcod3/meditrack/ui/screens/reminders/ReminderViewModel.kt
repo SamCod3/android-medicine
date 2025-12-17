@@ -27,44 +27,71 @@ class ReminderViewModel(
             initialValue = emptyList()
         )
     
-    private val _showAddDialog = MutableStateFlow(false)
-    val showAddDialog: StateFlow<Boolean> = _showAddDialog
+    private val _showDialog = MutableStateFlow(false)
+    val showDialog: StateFlow<Boolean> = _showDialog
     
-    fun showAddReminderDialog() {
-        _showAddDialog.value = true
+    private val _editingReminder = MutableStateFlow<Reminder?>(null)
+    val editingReminder: StateFlow<Reminder?> = _editingReminder
+    
+    fun showAddDialog() {
+        _editingReminder.value = null
+        _showDialog.value = true
     }
     
-    fun hideAddReminderDialog() {
-        _showAddDialog.value = false
+    fun showEditDialog(reminder: Reminder) {
+        _editingReminder.value = reminder
+        _showDialog.value = true
     }
     
-    fun addReminder(
+    fun hideDialog() {
+        _showDialog.value = false
+        _editingReminder.value = null
+    }
+    
+    fun saveReminder(
         hour: Int, 
         minute: Int,
-        // Schedule options
         scheduleType: ScheduleType,
         daysOfWeek: Int,
         intervalDays: Int,
         dayOfMonth: Int,
-        // Dosage options
         dosageQuantity: Int,
         dosageType: DosageType,
         dosagePortion: Portion?
     ) {
         viewModelScope.launch {
-            reminderRepository.createReminder(
-                medicationId = medicationId,
-                hour = hour,
-                minute = minute,
-                scheduleType = scheduleType,
-                daysOfWeek = daysOfWeek,
-                intervalDays = intervalDays,
-                dayOfMonth = dayOfMonth,
-                dosageQuantity = dosageQuantity,
-                dosageType = dosageType,
-                dosagePortion = dosagePortion
-            )
-            _showAddDialog.value = false
+            val editing = _editingReminder.value
+            if (editing != null) {
+                // Update existing
+                reminderRepository.updateReminder(
+                    editing.copy(
+                        hour = hour,
+                        minute = minute,
+                        scheduleType = scheduleType,
+                        daysOfWeek = daysOfWeek,
+                        intervalDays = intervalDays,
+                        dayOfMonth = dayOfMonth,
+                        dosageQuantity = dosageQuantity,
+                        dosageType = dosageType,
+                        dosagePortion = dosagePortion
+                    )
+                )
+            } else {
+                // Create new
+                reminderRepository.createReminder(
+                    medicationId = medicationId,
+                    hour = hour,
+                    minute = minute,
+                    scheduleType = scheduleType,
+                    daysOfWeek = daysOfWeek,
+                    intervalDays = intervalDays,
+                    dayOfMonth = dayOfMonth,
+                    dosageQuantity = dosageQuantity,
+                    dosageType = dosageType,
+                    dosagePortion = dosagePortion
+                )
+            }
+            hideDialog()
         }
     }
     

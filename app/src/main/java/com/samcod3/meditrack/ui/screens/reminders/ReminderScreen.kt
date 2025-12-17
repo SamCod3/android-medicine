@@ -80,7 +80,8 @@ fun ReminderScreen(
     viewModel: ReminderViewModel = koinViewModel { parametersOf(medicationId, medicationName) }
 ) {
     val reminders by viewModel.reminders.collectAsState()
-    val showAddDialog by viewModel.showAddDialog.collectAsState()
+    val showDialog by viewModel.showDialog.collectAsState()
+    val editingReminder by viewModel.editingReminder.collectAsState()
     
     Scaffold(
         topBar = {
@@ -103,7 +104,7 @@ fun ReminderScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.showAddReminderDialog() }) {
+            FloatingActionButton(onClick = { viewModel.showAddDialog() }) {
                 Icon(Icons.Default.Add, contentDescription = "Añadir recordatorio")
             }
         }
@@ -121,6 +122,7 @@ fun ReminderScreen(
                 items(reminders, key = { it.id }) { reminder ->
                     ReminderCard(
                         reminder = reminder,
+                        onClick = { viewModel.showEditDialog(reminder) },
                         onToggle = { viewModel.toggleReminder(reminder.id, it) },
                         onDelete = { viewModel.deleteReminder(reminder.id) }
                     )
@@ -129,11 +131,12 @@ fun ReminderScreen(
         }
     }
     
-    if (showAddDialog) {
-        AddReminderDialog(
-            onDismiss = { viewModel.hideAddReminderDialog() },
+    if (showDialog) {
+        ReminderDialog(
+            initialReminder = editingReminder,
+            onDismiss = { viewModel.hideDialog() },
             onConfirm = { hour, minute, scheduleType, daysOfWeek, intervalDays, dayOfMonth, quantity, type, portion ->
-                viewModel.addReminder(hour, minute, scheduleType, daysOfWeek, intervalDays, dayOfMonth, quantity, type, portion)
+                viewModel.saveReminder(hour, minute, scheduleType, daysOfWeek, intervalDays, dayOfMonth, quantity, type, portion)
             }
         )
     }
@@ -169,11 +172,14 @@ private fun EmptyRemindersMessage(modifier: Modifier = Modifier) {
 @Composable
 private fun ReminderCard(
     reminder: Reminder,
+    onClick: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (reminder.enabled) 
@@ -230,7 +236,8 @@ private fun ReminderCard(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun AddReminderDialog(
+private fun ReminderDialog(
+    initialReminder: Reminder?,
     onDismiss: () -> Unit,
     onConfirm: (
         hour: Int, 
@@ -244,25 +251,30 @@ private fun AddReminderDialog(
         portion: Portion?
     ) -> Unit
 ) {
-    val timePickerState = rememberTimePickerState(initialHour = 8, initialMinute = 0)
+    val isEditing = initialReminder != null
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialReminder?.hour ?: 8, 
+        initialMinute = initialReminder?.minute ?: 0
+    )
     
     // Schedule state
-    var selectedScheduleType by remember { mutableStateOf(ScheduleType.DAILY) }
-    var selectedDays by remember { mutableIntStateOf(0) } // bitmask
-    var intervalDays by remember { mutableFloatStateOf(2f) }
-    var dayOfMonth by remember { mutableFloatStateOf(1f) }
+    var selectedScheduleType by remember { mutableStateOf(initialReminder?.scheduleType ?: ScheduleType.DAILY) }
+    var selectedDays by remember { mutableIntStateOf(initialReminder?.daysOfWeek ?: 0) }
+    var intervalDaysValue by remember { mutableFloatStateOf(initialReminder?.intervalDays?.toFloat() ?: 2f) }
+    var dayOfMonthValue by remember { mutableFloatStateOf(initialReminder?.dayOfMonth?.toFloat() ?: 1f) }
     var expandedSchedule by remember { mutableStateOf(false) }
     
     // Dosage state
-    var quantity by remember { mutableStateOf("1") }
-    var selectedDosageType by remember { mutableStateOf(DosageType.COMPRIMIDO) }
-    var selectedPortion by remember { mutableStateOf(Portion.ENTERA) }
+    var quantity by remember { mutableStateOf(initialReminder?.dosageQuantity?.toString() ?: "1") }
+    var selectedDosageType by remember { mutableStateOf(initialReminder?.dosageType ?: DosageType.COMPRIMIDO) }
+    var selectedPortion by remember { mutableStateOf(initialReminder?.dosagePortion ?: Portion.ENTERA) }
     var expandedType by remember { mutableStateOf(false) }
     var expandedPortion by remember { mutableStateOf(false) }
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nuevo recordatorio") },
+        modifier = Modifier.fillMaxWidth(0.95f),
+        title = { Text(if (isEditing) "Editar recordatorio" else "Nuevo recordatorio") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState())
@@ -323,20 +335,20 @@ private fun AddReminderDialog(
                         )
                     }
                     ScheduleType.INTERVAL -> {
-                        Text("Cada ${intervalDays.roundToInt()} días", style = MaterialTheme.typography.bodyMedium)
+                        Text("Cada ${intervalDaysValue.roundToInt()} días", style = MaterialTheme.typography.bodyMedium)
                         Slider(
-                            value = intervalDays,
-                            onValueChange = { intervalDays = it },
+                            value = intervalDaysValue,
+                            onValueChange = { intervalDaysValue = it },
                             valueRange = 2f..30f,
                             steps = 27,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                     ScheduleType.MONTHLY -> {
-                        Text("Día ${dayOfMonth.roundToInt()} de cada mes", style = MaterialTheme.typography.bodyMedium)
+                        Text("Día ${dayOfMonthValue.roundToInt()} de cada mes", style = MaterialTheme.typography.bodyMedium)
                         Slider(
-                            value = dayOfMonth,
-                            onValueChange = { dayOfMonth = it },
+                            value = dayOfMonthValue,
+                            onValueChange = { dayOfMonthValue = it },
                             valueRange = 1f..31f,
                             steps = 29,
                             modifier = Modifier.fillMaxWidth()
@@ -441,8 +453,8 @@ private fun AddReminderDialog(
                     timePickerState.minute,
                     selectedScheduleType,
                     selectedDays,
-                    intervalDays.roundToInt(),
-                    dayOfMonth.roundToInt(),
+                    intervalDaysValue.roundToInt(),
+                    dayOfMonthValue.roundToInt(),
                     qty,
                     selectedDosageType,
                     portion
