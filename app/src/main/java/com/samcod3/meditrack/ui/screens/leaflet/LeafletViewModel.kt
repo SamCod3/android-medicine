@@ -39,7 +39,12 @@ class LeafletViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
             // First get medication info
-            val medicationResult = drugRepository.getMedicationByNationalCode(nationalCode)
+            // Support both National Code (6-7 digits) and Registration Number (5 digits)
+            val medicationResult = if (nationalCode.length == 5) {
+                drugRepository.getMedicationByRegistrationNumber(nationalCode)
+            } else {
+                drugRepository.getMedicationByNationalCode(nationalCode)
+            }
             
             if (medicationResult.isSuccess) {
                 val medication = medicationResult.getOrThrow()
@@ -77,7 +82,7 @@ class LeafletViewModel(
             
             val result = userMedicationRepository.saveMedication(
                 profileId = profileId,
-                nationalCode = nationalCode,
+                nationalCode = medication.nationalCode ?: nationalCode,
                 name = medication.name,
                 description = medication.activeIngredients.joinToString(", ") { "${it.name} ${it.quantity}${it.unit}" },
                 notes = null

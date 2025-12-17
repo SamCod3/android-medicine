@@ -6,6 +6,7 @@ import com.samcod3.meditrack.domain.model.Medication
 
 interface DrugRepository {
     suspend fun getMedicationByNationalCode(nationalCode: String): Result<Medication>
+    suspend fun getMedicationByRegistrationNumber(registrationNumber: String): Result<Medication>
     // Changed signature to accept Medication to have URL access
     suspend fun getLeaflet(medication: Medication): Result<Leaflet>
     @Deprecated("Use getLeaflet(medication)")

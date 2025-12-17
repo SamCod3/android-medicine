@@ -17,6 +17,14 @@ interface CimaApiService {
     suspend fun getMedicationByNationalCode(
         @Query("cn") nationalCode: String
     ): Response<MedicationDto>
+
+    /**
+     * Search medication by registration number (for manual search results)
+     */
+    @GET("medicamento")
+    suspend fun getMedicationByRegistrationNumber(
+        @Query("nregistro") registrationNumber: String
+    ): Response<MedicationDto>
     
     /**
      * Search medications by name

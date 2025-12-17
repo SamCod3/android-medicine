@@ -61,6 +61,25 @@ class DrugRepositoryImpl(
         }
     }
     
+    override suspend fun getMedicationByRegistrationNumber(registrationNumber: String): Result<Medication> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Fetching medication for NReg: $registrationNumber")
+                val response = cimaApi.getMedicationByRegistrationNumber(registrationNumber)
+                
+                if (response.isSuccessful && response.body() != null) {
+                    val medication = response.body()!!.toDomain(null)
+                    Result.success(medication)
+                } else {
+                    Result.failure(Exception("No encontrado por registro: $registrationNumber"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching medication by nreg", e)
+                Result.failure(e)
+            }
+        }
+    }
+
     override suspend fun getLeaflet(registrationNumber: String): Result<Leaflet> {
         return withContext(Dispatchers.IO) {
             try {

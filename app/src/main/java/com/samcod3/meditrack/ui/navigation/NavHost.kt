@@ -52,8 +52,9 @@ fun MediTrackNavHost() {
             SearchScreen(
                 onBackClick = { navController.popBackStack() },
                 onMedicationClick = { medication ->
-                     if (!medication.nationalCode.isNullOrBlank()) {
-                         navController.navigate(Screen.Leaflet.createRoute(medication.nationalCode, profileId))
+                     val code = medication.nationalCode ?: medication.registrationNumber
+                     if (code.isNotBlank()) {
+                         navController.navigate(Screen.Leaflet.createRoute(code, profileId))
                      }
                 }
             )
