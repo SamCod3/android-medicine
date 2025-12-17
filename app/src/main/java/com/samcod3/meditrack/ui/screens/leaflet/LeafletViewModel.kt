@@ -2,7 +2,7 @@ package com.samcod3.meditrack.ui.screens.leaflet
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.samcod3.meditrack.data.repository.DrugRepository
+import com.samcod3.meditrack.domain.repository.DrugRepository
 import com.samcod3.meditrack.domain.model.LeafletSection
 import com.samcod3.meditrack.domain.model.Medication
 import com.samcod3.meditrack.domain.repository.UserMedicationRepository

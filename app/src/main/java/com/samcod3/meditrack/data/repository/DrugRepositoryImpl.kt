@@ -3,17 +3,16 @@ package com.samcod3.meditrack.data.repository
 import android.util.Log
 import com.samcod3.meditrack.data.remote.api.CimaApiService
 import com.samcod3.meditrack.data.remote.dto.MedicationDto
-import com.samcod3.meditrack.data.remote.dto.SearchResponseDto
+import com.samcod3.meditrack.data.remote.parser.LeafletHtmlParser
 import com.samcod3.meditrack.domain.model.ActiveIngredient
 import com.samcod3.meditrack.domain.model.Leaflet
 import com.samcod3.meditrack.domain.model.LeafletSection
 import com.samcod3.meditrack.domain.model.Medication
+import com.samcod3.meditrack.domain.repository.DrugRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
 
 class DrugRepositoryImpl(
     private val cimaApi: CimaApiService
@@ -119,9 +118,13 @@ class DrugRepositoryImpl(
                 if (sections.isEmpty() && !medication.leafletUrl.isNullOrBlank()) {
                     Log.d(TAG, "Segmented content missing, parsing HTML from: ${medication.leafletUrl}")
                     try {
-                        val parsedSections = parseHtmlLeaflet(medication.leafletUrl)
-                        if (parsedSections.isNotEmpty()) {
-                            sections = parsedSections
+                        val htmlResponse = cimaApi.downloadUrl(medication.leafletUrl)
+                        if (htmlResponse.isSuccessful && htmlResponse.body() != null) {
+                            val html = htmlResponse.body()!!.string()
+                            val parsedSections = LeafletHtmlParser.parse(html)
+                            if (parsedSections.isNotEmpty()) {
+                                sections = parsedSections
+                            }
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "HTML parsing failed", e)
@@ -133,206 +136,6 @@ class DrugRepositoryImpl(
                 Log.e(TAG, "Error fetching leaflet", e)
                 Result.failure(e)
             }
-        }
-    }
-    
-    private suspend fun parseHtmlLeaflet(url: String): List<LeafletSection> {
-        val response = cimaApi.downloadUrl(url)
-        if (!response.isSuccessful || response.body() == null) return emptyList()
-        
-        val html = response.body()!!.string()
-        val doc = Jsoup.parse(html)
-        var sections = mutableListOf<LeafletSection>()
-        
-        // STRATEGY 0: Semantic IDs (h1 id="1" + section) - Based on user screenshot
-        // The structure is <h1 id="N">Title</h1> <section>Content</section>
-        try {
-            var foundSemantic = false
-            for (i in 1..6) {
-                val id = "$i"
-                val header = doc.getElementById(id)
-                
-                if (header != null && (header.tagName() == "h1" || header.tagName() == "h2" || header.tagName() == "h3")) {
-                    val title = header.text().trim()
-                    val contentElement = header.nextElementSibling()
-                    val content = contentElement?.outerHtml() ?: ""
-                    
-                    if (content.isNotBlank()) {
-                         sections.add(LeafletSection(i, title, content))
-                         foundSemantic = true
-                    }
-                }
-            }
-            
-            if (foundSemantic && sections.size >= 1) {
-                Log.d(TAG, "Using Semantic ID parsing strategy")
-                return sections
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Semantic ID parsing failed", e)
-        }
-        
-        // STRATEGY 1: Parse table of contents (Index links)
-        // Look for links that point to internal anchors (#) and contain section keywords
-        try {
-            val indexLinks = doc.select("a[href^='#']")
-            val sectionConnectors = mutableListOf<Pair<Int, String>>() // SectionNum -> TargetId
-            
-            for (link in indexLinks) {
-                val text = link.text().trim()
-                val href = link.attr("href").substring(1) // remove #
-                
-                val num = getSectionNumberFromText(text)
-                if (num != null) {
-                    // Avoid duplicates, take the first one for each section
-                    if (sectionConnectors.none { it.first == num }) {
-                        sectionConnectors.add(num to href)
-                    }
-                }
-            }
-            
-            if (sectionConnectors.size >= 3) { // If we found at least 3 sections via index, trust this method
-                Log.d(TAG, "Using Index-Based parsing strategy")
-                // Sort by section number
-                sectionConnectors.sortBy { it.first }
-                
-                for (i in 0 until sectionConnectors.size) {
-                    val (num, id) = sectionConnectors[i]
-                    val nextId = if (i < sectionConnectors.size - 1) sectionConnectors[i+1].second else null
-                    
-                    // Find start element
-                    // Can be id="id" or name="id"
-                    var startEl = doc.getElementById(id)
-                    if (startEl == null) {
-                        startEl = doc.select("[name='$id']").first()
-                    }
-                    
-                    if (startEl != null) {
-                        val title = startEl.text().ifBlank { "Sección $num" }
-                        val contentBuilder = StringBuilder()
-                        
-                        // Collect siblings until next ID or end
-                        var current = startEl.nextElementSibling()
-                        var reachedNext = false
-                        
-                        while (current != null) {
-                            // Check if we reached next section
-                            if (nextId != null) {
-                                if (current.id() == nextId || current.attr("name") == nextId) {
-                                    reachedNext = true
-                                    break
-                                }
-                                // Also check descendants (sometimes the anchor is inside a div)
-                                if (current.select("#$nextId, [name='$nextId']").isNotEmpty()) {
-                                    reachedNext = true
-                                    break
-                                }
-                            }
-                            
-                            contentBuilder.append(current.outerHtml())
-                            current = current.nextElementSibling()
-                        }
-                        
-                        sections.add(LeafletSection(num, title, contentBuilder.toString()))
-                    }
-                }
-                
-                if (sections.isNotEmpty()) return sections
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Index parsing failed, falling back to regex", e)
-        }
-        
-        // STRATEGY 2: Fallback to Regex / Text Scanning (Previous Logic)
-        Log.d(TAG, "Using Regex-Based parsing strategy")
-        // ... (existing regex logic) ...
-        
-        val container = doc.select(".texto_prospecto").first() ?: doc.body()
-        val headerRegex = Regex("""^([1-6])[\s\.\-\)]+(.*)""")
-        
-        var currentSectionNum = 0
-        var currentTitle = ""
-        var currentContent = StringBuilder()
-        
-        // Iterate over all semantic block elements + strong/bold/span
-        // We use 'select' to get flat list of relevant elements in order
-        val elements = container.select("p, div, h1, h2, h3, h4, h5, h6, header, li, strong, b, span")
-        
-        for (element in elements) {
-            val text = element.text().trim()
-            if (text.isBlank()) continue
-            if (text.length > 200) {
-                 if (currentSectionNum > 0) currentContent.append("<p>${element.html()}</p>")
-                 continue
-            }
-            
-            val match = headerRegex.find(text)
-            var foundSectionNum: Int? = null
-            
-            if (match != null) {
-                 try {
-                    val num = match.groupValues[1].toInt()
-                    // Helper to validate title content
-                    if (isValidSectionTitle(num, match.groupValues[2])) {
-                        foundSectionNum = num
-                        currentTitle = text
-                    }
-                } catch (e: Exception) {}
-            }
-            
-            // Fallback: Check without number if regex failed but text looks like a header (e.g. "DATOS CLÍNICOS")
-            // Not implemented to keep it simple, regex is usually enough.
-            
-            if (foundSectionNum != null && foundSectionNum > currentSectionNum) {
-                if (currentSectionNum > 0) {
-                    sections.add(LeafletSection(currentSectionNum, currentTitle, currentContent.toString()))
-                }
-                currentSectionNum = foundSectionNum
-                currentContent = StringBuilder()
-                currentTitle = text 
-            } else if (currentSectionNum > 0) {
-                if (element.tagName() in listOf("p", "li", "div")) {
-                     currentContent.append(element.outerHtml())
-                }
-            }
-        }
-        
-        if (currentSectionNum > 0) {
-            sections.add(LeafletSection(currentSectionNum, currentTitle, currentContent.toString()))
-        }
-        
-        return sections
-    }
-    
-    private fun getSectionNumberFromText(text: String): Int? {
-        val lower = text.lowercase()
-        // Check for number explicitly first "1. "
-        for (i in 1..6) {
-           if (text.startsWith("$i") && (text.contains(".") || text.contains("-") || text.contains(" "))) {
-               if (isValidSectionTitle(i, lower)) return i
-           }
-        }
-        // Should we check without number? Some indexes are just "Qué es..."
-        if (lower.contains("qué es") || lower.contains("que es")) return 1
-        if (lower.contains("antes de") || lower.contains("necesita saber")) return 2
-        if (lower.contains("cómo tomar") || lower.contains("como usar") || lower.contains("posología")) return 3
-        if (lower.contains("efectos adversos")) return 4
-        if (lower.contains("conservación")) return 5
-        if (lower.contains("contenido del envase") || lower.contains("información adicional")) return 6
-        
-        return null
-    }
-    
-    private fun isValidSectionTitle(num: Int, titlePart: String): Boolean {
-        val lower = titlePart.lowercase()
-        return when (num) {
-            1 -> lower.contains("qué es") || lower.contains("que es")
-            2 -> lower.contains("necesita saber") || lower.contains("antes de") || lower.contains("tenga cuidado")
-            3 -> lower.contains("cómo") || lower.contains("como") || lower.contains("usar")
-            4 -> lower.contains("efectos") || lower.contains("adversos")
-            5 -> lower.contains("conservación") || lower.contains("conservacion")
-            6 -> lower.contains("contenido") || lower.contains("envase") || lower.contains("información")
-            else -> false
         }
     }
 
@@ -427,8 +230,16 @@ class DrugRepositoryImpl(
                 
                 if (sections.isEmpty() && !medication.leafletUrl.isNullOrBlank()) {
                      Log.d(TAG, "Parsing HTML from ${medication.leafletUrl}")
-                     val parsed = parseHtmlLeaflet(medication.leafletUrl!!)
-                     if (parsed.isNotEmpty()) sections = parsed
+                     try {
+                         val htmlResponse = cimaApi.downloadUrl(medication.leafletUrl!!)
+                         if (htmlResponse.isSuccessful && htmlResponse.body() != null) {
+                             val html = htmlResponse.body()!!.string()
+                             val parsed = LeafletHtmlParser.parse(html)
+                             if (parsed.isNotEmpty()) sections = parsed
+                         }
+                     } catch (e: Exception) {
+                         Log.e(TAG, "HTML parsing failed", e)
+                     }
                 }
                 
                 Result.success(Leaflet(medication, sections))

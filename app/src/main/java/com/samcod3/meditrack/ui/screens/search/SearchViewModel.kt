@@ -2,7 +2,7 @@ package com.samcod3.meditrack.ui.screens.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.samcod3.meditrack.data.repository.DrugRepository
+import com.samcod3.meditrack.domain.repository.DrugRepository
 import com.samcod3.meditrack.domain.model.Medication
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

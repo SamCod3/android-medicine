@@ -74,6 +74,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.samcod3.meditrack.R
+import com.samcod3.meditrack.domain.util.BarcodeExtractor
 import org.koin.androidx.compose.koinViewModel
 import java.util.concurrent.Executors
 
@@ -311,8 +312,8 @@ private fun captureAndProcessText(
                             val foundBarcode = barcodes.firstOrNull()?.rawValue
                             if (!foundBarcode.isNullOrBlank()) {
                                 // Success! We found a barcode in the static image
-                                val cn = extractNationalCode(foundBarcode)
-                                Log.d("ScannerHybrid", "Barcode found in static image: $cn")
+                                val cn = BarcodeExtractor.extractNationalCode(foundBarcode)
+                                Log.d("ScannerHybrid", "Barcode from capture: $cn")
                                 onResult(cn, null)
                                 imageProxy.close()
                                 barcodeScanner.close()
@@ -350,8 +351,8 @@ private fun processTextOcr(
     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     recognizer.process(inputImage)
         .addOnSuccessListener { visionText ->
-            val foundCN = findCNInText(visionText.text)
-            Log.d("ScannerHybrid", "OCR Result: $foundCN")
+            val foundCN = BarcodeExtractor.findCNInText(visionText.text)
+            Log.d("ScannerHybrid", "OCR CN: $foundCN")
             onResult(foundCN, visionText.text)
         }
         .addOnFailureListener { e ->
@@ -362,55 +363,6 @@ private fun processTextOcr(
             imageProxy.close()
             recognizer.close()
         }
-}
-
-private fun findCNInText(text: String): String? {
-    Log.d("ScannerOCR", "Scanned text: $text")
-    
-    // 1. Explicit CN label: "CN: 123456" or "C.N. 123456.7"
-    val cnLabelRegex = Regex("""(?:C\.?N\.?|C\.N)\s*[:\.]?\s*(\d{6,7})""", RegexOption.IGNORE_CASE)
-    val matchLabel = cnLabelRegex.find(text)
-    if (matchLabel != null) return matchLabel.groupValues[1]
-    
-    // 2. Look for GTIN-14 (0847...) or EAN-13 (84...) patterns often printed on boxes
-    // The OCR might capture "08470007058328" which is a valid GTIN containing the CN.
-    val longNumberRegex = Regex("""\b(\d{13,14})\b""")
-    val longMatches = longNumberRegex.findAll(text)
-    
-    for (match in longMatches) {
-        val number = match.groupValues[1]
-        
-        // GTIN-14 Spanish format: 0847XXXXXXXXXC
-        if (number.length == 14 && number.startsWith("0847")) {
-            // CN is in positions 4-12 (9 digits)
-            val cnRaw = number.substring(4, 13)
-            return cnRaw.trimStart('0')
-        }
-        
-        // EAN-13 Spanish format: 84XXXXXXXC
-        if (number.length == 13 && number.startsWith("84")) {
-            // CN is in positions 2-9 (7 digits)
-            val cnRaw = number.substring(2, 9)
-            return cnRaw.trimStart('0')
-        }
-    }
-    
-    // 3. Fallback: look for 6-7 digits isolated
-    val codeRegex = Regex("""\b(\d{6,7})\b""")
-    // Filter out unlikely candidates (year numbers like 2024, 2025 unless they look like CN)
-    val matches = codeRegex.findAll(text)
-        .map { it.groupValues[1] }
-        .filter { candidate -> 
-            // Avoid typical year numbers if they appear isolated
-            val num = candidate.toIntOrNull() ?: 0
-            // CNs are usually > 600000. Low numbers usually imply other things.
-            // But strict filtering might be bad. Let's just prefer starting with 6,7,8,9
-            true 
-        }
-        .toList()
-    
-    // Heuristic preference
-    return matches.firstOrNull { it.length == 7 } ?: matches.firstOrNull()
 }
 
 @Composable
@@ -470,7 +422,7 @@ private fun CameraPreview(
                         barcodeScanner.process(inputImage)
                             .addOnSuccessListener { barcodes ->
                                 barcodes.firstOrNull()?.rawValue?.let { code ->
-                                    val nationalCode = extractNationalCode(code)
+                                    val nationalCode = BarcodeExtractor.extractNationalCode(code)
                                     onBarcodeDetected(nationalCode)
                                 }
                             }
@@ -544,80 +496,6 @@ private fun ScanOverlay(scanMode: ScanMode) {
             )
         }
     }
-}
-
-
-private fun extractNationalCode(barcode: String): String {
-    // Clean up the barcode (remove FNC1 characters and whitespace)
-    val cleanCode = barcode.replace("\u001D", "").replace("\\s".toRegex(), "")
-    
-    Log.d("Scanner", "Clean code: $cleanCode (length: ${cleanCode.length})")
-    
-    // Check for GS1 DataMatrix format (starts with 01 for GTIN)
-    if (cleanCode.startsWith("01") && cleanCode.length >= 16) {
-        return extractFromGS1(cleanCode)
-    }
-    
-    // 1. Check for specific Health prefixes (NTIN) where CN is embedded
-    // Format: P(6) + CN(6) + DC(1)
-    
-    // Medicamentos (847000)
-    if (cleanCode.startsWith("847000") && cleanCode.length == 13) {
-        return cleanCode.substring(6, 12)
-    }
-
-    // Productos Sanitarios (848000)
-    if (cleanCode.startsWith("848000") && cleanCode.length == 13) {
-        return cleanCode.substring(6, 12)
-    }
-
-    // 2. Generic EAN-13 (Spain 84) fallback
-    // WARNING: Commercial products (843, 841...) DO NOT have an embedded CN in fixed position.
-    // We strictly avoid extracting substrings for them to prevent false CNs.
-    
-    // Legacy support: Only if we are SURE it follows the old Short-CN pattern (rare now, usually wrapped in 847000)
-    // For now, we return the full code for non-847/848 prefixes to let the API handle "Not Found" cleanly.
-    
-    // Check if it's already a plain national code (6-7 digits) manually entered or recognized by OCR as such
-    if (cleanCode.length in 6..7 && cleanCode.all { it.isDigit() }) {
-        return cleanCode.trimStart('0')
-    }
-    
-    // Return the full code (GTIN/EAN) for everything else
-    return cleanCode
-}
-
-private fun extractFromGS1(code: String): String {
-    Log.d("Scanner", "Parsing GS1: $code")
-    
-    // AI 01 = GTIN (14 digits)
-    val gtinStart = code.indexOf("01")
-    if (gtinStart != -1 && code.length >= gtinStart + 16) {
-        val gtin = code.substring(gtinStart + 2, gtinStart + 16)
-        Log.d("Scanner", "GTIN: $gtin")
-        
-        // Spanish NTIN (Medicines & Health Products)
-        // 847000xxxxxxC -> Medicines
-        // 848000xxxxxxC -> Health Products
-        if (gtin.startsWith("0847000") || gtin.startsWith("847000") || 
-            gtin.startsWith("0848000") || gtin.startsWith("848000")) {
-            
-            // Allow for 13 or 14 digit GTIN string inputs
-            val offset = if (gtin.length == 14) 7 else 6 
-            // The prefix is 847000/0847000 (length 6/7)
-            
-            // Extract the next 6 digits (CN)
-             if (gtin.length >= offset + 6) {
-                val cn = gtin.substring(offset, offset + 6)
-                Log.d("Scanner", "NTIN detected. Extracted CN: $cn")
-                return cn
-             }
-        }
-        
-
-    }
-    
-    return code
 }
 
 @Composable
