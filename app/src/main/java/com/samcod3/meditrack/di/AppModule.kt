@@ -1,5 +1,6 @@
 package com.samcod3.meditrack.di
 
+import com.samcod3.meditrack.ui.screens.allreminders.AllRemindersViewModel
 import com.samcod3.meditrack.ui.screens.home.HomeViewModel
 import com.samcod3.meditrack.ui.screens.leaflet.LeafletViewModel
 import com.samcod3.meditrack.ui.screens.profiles.ProfileViewModel
@@ -38,4 +39,7 @@ val appModule = module {
             reminderRepository = get()
         )
     }
+    // AllRemindersViewModel for global agenda view
+    viewModel { AllRemindersViewModel(get()) }
 }
+

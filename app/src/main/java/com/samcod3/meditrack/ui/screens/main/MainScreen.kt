@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Search
@@ -22,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.samcod3.meditrack.ui.screens.allreminders.AllRemindersScreen
 import com.samcod3.meditrack.ui.screens.home.HomeScreen
 import com.samcod3.meditrack.ui.screens.scanner.ScannerScreen
 import com.samcod3.meditrack.ui.screens.search.SearchScreen
@@ -33,6 +36,7 @@ data class BottomNavItem(
 )
 
 private val bottomNavItems = listOf(
+    BottomNavItem("Agenda", Icons.Filled.CalendarToday, Icons.Outlined.CalendarToday),
     BottomNavItem("Botiquín", Icons.Filled.Home, Icons.Outlined.Home),
     BottomNavItem("Escanear", Icons.Filled.QrCodeScanner, Icons.Outlined.QrCodeScanner),
     BottomNavItem("Buscar", Icons.Filled.Search, Icons.Outlined.Search)
@@ -47,7 +51,7 @@ fun MainScreen(
     onReminderClick: (medicationId: String, medicationName: String) -> Unit,
     onChangeProfile: () -> Unit
 ) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 = Agenda (first tab now)
     
     Scaffold(
         bottomBar = {
@@ -74,19 +78,24 @@ fun MainScreen(
                 .padding(paddingValues)
         ) {
             when (selectedTab) {
-                0 -> HomeScreen(
+                0 -> AllRemindersScreen(
+                    profileName = profileName,
+                    onChangeProfile = onChangeProfile,
+                    onReminderClick = onReminderClick
+                )
+                1 -> HomeScreen(
                     profileId = profileId,
                     profileName = profileName,
                     onMedicationClick = onMedicationClicked,
                     onReminderClick = onReminderClick,
                     onChangeProfile = onChangeProfile
                 )
-                1 -> ScannerScreen(
+                2 -> ScannerScreen(
                     onMedicationScanned = onMedicationScanned,
-                    onSearchRequested = { selectedTab = 2 }
+                    onSearchRequested = { selectedTab = 3 }
                 )
-                2 -> SearchScreen(
-                    onBackClick = { selectedTab = 0 },
+                3 -> SearchScreen(
+                    onBackClick = { selectedTab = 1 },
                     onMedicationClick = { medication ->
                         val code = medication.nationalCode ?: medication.registrationNumber
                         if (code.isNotBlank()) {
