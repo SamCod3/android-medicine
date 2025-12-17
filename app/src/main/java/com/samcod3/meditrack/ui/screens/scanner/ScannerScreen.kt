@@ -268,11 +268,11 @@ private fun extractNationalCode(barcode: String): String {
  * 
  * GTIN for Spanish meds: 08470007058328 where:
  * - 0847 = GS1 Spain prefix for pharma
- * - 00070583 = Contains the National Code (CN) - 6-7 digits with possible leading zeros
- * - 28 = check digit area
+ * - 000705832 = Contains the National Code (CN) - 6-7 digits with leading zeros
+ * - 8 = check digit
  * 
- * The CN is typically found at GTIN positions 4-11 (8 digits), removing leading zeros.
- * Example: GTIN 08470007058328 → 00070583 → CN 7058328 or 705832
+ * The CN is found at GTIN positions 4-12 (9 digits), excluding the check digit.
+ * Example: GTIN 08470007058328 → 000705832 → CN 705832
  */
 private fun extractFromGS1(code: String): String {
     Log.d("Scanner", "Parsing GS1: $code")
@@ -284,11 +284,11 @@ private fun extractFromGS1(code: String): String {
         Log.d("Scanner", "GTIN: $gtin")
         
         // Spanish pharma GTIN: 08470007058328
-        // National code is in positions 4-12 (8 digits), before the check digit
+        // National code is in positions 4-12 (9 digits), the last digit is check digit
         if (gtin.startsWith("0847") || gtin.startsWith("847")) {
             val cnStart = if (gtin.startsWith("0847")) 4 else 3
-            // Take 8 digits (positions 4-11), which contains the CN with possible leading zeros
-            val cnRaw = gtin.substring(cnStart, minOf(cnStart + 8, gtin.length - 1))
+            // Take 9 digits (positions 4-12), excluding the final check digit
+            val cnRaw = gtin.substring(cnStart, minOf(cnStart + 9, gtin.length - 1))
             // Remove leading zeros to get the actual CN (usually 6-7 digits)
             val cn = cnRaw.trimStart('0')
             Log.d("Scanner", "Raw CN: $cnRaw, Extracted CN: $cn")
@@ -298,8 +298,8 @@ private fun extractFromGS1(code: String): String {
         // Alternative: look for 84 pattern anywhere in GTIN
         if (gtin.contains("84")) {
             val idx84 = gtin.indexOf("84")
-            // After 84, take up to 8 digits (before check digit)
-            val cnRaw = gtin.substring(idx84 + 2, minOf(idx84 + 10, gtin.length - 1))
+            // After 84, take up to 9 digits (before check digit)
+            val cnRaw = gtin.substring(idx84 + 2, minOf(idx84 + 11, gtin.length - 1))
             val cn = cnRaw.trimStart('0')
             Log.d("Scanner", "Alt Raw CN: $cnRaw, Extracted CN: $cn")
             return cn
