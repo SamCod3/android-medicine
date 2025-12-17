@@ -112,115 +112,169 @@ class DrugRepositoryImpl(
         
         val html = response.body()!!.string()
         val doc = Jsoup.parse(html)
-        val sections = mutableListOf<LeafletSection>()
+        var sections = mutableListOf<LeafletSection>()
         
-        // Find body - usually inside a container with class 'texto_prospecto' or just body
+        // STRATEGY 1: Parse table of contents (Index links)
+        // Look for links that point to internal anchors (#) and contain section keywords
+        try {
+            val indexLinks = doc.select("a[href^='#']")
+            val sectionConnectors = mutableListOf<Pair<Int, String>>() // SectionNum -> TargetId
+            
+            for (link in indexLinks) {
+                val text = link.text().trim()
+                val href = link.attr("href").substring(1) // remove #
+                
+                val num = getSectionNumberFromText(text)
+                if (num != null) {
+                    // Avoid duplicates, take the first one for each section
+                    if (sectionConnectors.none { it.first == num }) {
+                        sectionConnectors.add(num to href)
+                    }
+                }
+            }
+            
+            if (sectionConnectors.size >= 3) { // If we found at least 3 sections via index, trust this method
+                Log.d(TAG, "Using Index-Based parsing strategy")
+                // Sort by section number
+                sectionConnectors.sortBy { it.first }
+                
+                for (i in 0 until sectionConnectors.size) {
+                    val (num, id) = sectionConnectors[i]
+                    val nextId = if (i < sectionConnectors.size - 1) sectionConnectors[i+1].second else null
+                    
+                    // Find start element
+                    // Can be id="id" or name="id"
+                    var startEl = doc.getElementById(id)
+                    if (startEl == null) {
+                        startEl = doc.select("[name='$id']").first()
+                    }
+                    
+                    if (startEl != null) {
+                        val title = startEl.text().ifBlank { "Sección $num" }
+                        val contentBuilder = StringBuilder()
+                        
+                        // Collect siblings until next ID or end
+                        var current = startEl.nextElementSibling()
+                        var reachedNext = false
+                        
+                        while (current != null) {
+                            // Check if we reached next section
+                            if (nextId != null) {
+                                if (current.id() == nextId || current.attr("name") == nextId) {
+                                    reachedNext = true
+                                    break
+                                }
+                                // Also check descendants (sometimes the anchor is inside a div)
+                                if (current.select("#$nextId, [name='$nextId']").isNotEmpty()) {
+                                    reachedNext = true
+                                    break
+                                }
+                            }
+                            
+                            contentBuilder.append(current.outerHtml())
+                            current = current.nextElementSibling()
+                        }
+                        
+                        sections.add(LeafletSection(num, title, contentBuilder.toString()))
+                    }
+                }
+                
+                if (sections.isNotEmpty()) return sections
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Index parsing failed, falling back to regex", e)
+        }
+        
+        // STRATEGY 2: Fallback to Regex / Text Scanning (Previous Logic)
+        Log.d(TAG, "Using Regex-Based parsing strategy")
+        // ... (existing regex logic) ...
+        
         val container = doc.select(".texto_prospecto").first() ?: doc.body()
-        
-        // Regex to match section headers: "1. Title", "1.- Title", "1 . Title"
-        // Also captures the number (group 1) and title (group 2)
         val headerRegex = Regex("""^([1-6])[\s\.\-\)]+(.*)""")
         
         var currentSectionNum = 0
         var currentTitle = ""
         var currentContent = StringBuilder()
         
-        // Iterate over all semantic block elements + strong/bold
-        // We use 'select' to get flat list of relevant elements in order
         val elements = container.select("p, div, h1, h2, h3, h4, h5, h6, li, strong, b")
         
         for (element in elements) {
             val text = element.text().trim()
             if (text.isBlank()) continue
-            
-            // Optimization: Skip very long texts checking for header, headers are short
             if (text.length > 200) {
                  if (currentSectionNum > 0) currentContent.append("<p>${element.html()}</p>")
                  continue
             }
             
-            // Check if this element is a Header
             val match = headerRegex.find(text)
             var foundSectionNum: Int? = null
             
             if (match != null) {
-                try {
+                 try {
                     val num = match.groupValues[1].toInt()
-                    val titlePart = match.groupValues[2].lowercase()
-                    
-                    // Validate keywords to ensure it's a real section header and not just "1.5 mg"
-                    val isValid = when (num) {
-                        1 -> titlePart.contains("qué es") || titlePart.contains("que es")
-                        2 -> titlePart.contains("necesita saber") || titlePart.contains("antes de") || titlePart.contains("tenga cuidado")
-                        3 -> titlePart.contains("cómo") || titlePart.contains("como") || titlePart.contains("usar")
-                        4 -> titlePart.contains("efectos") || titlePart.contains("adversos")
-                        5 -> titlePart.contains("conservación") || titlePart.contains("conservacion")
-                        6 -> titlePart.contains("contenido") || titlePart.contains("envase") || titlePart.contains("información")
-                        else -> false
-                    }
-                    
-                    if (isValid) {
+                    // Helper to validate title content
+                    if (isValidSectionTitle(num, match.groupValues[2])) {
                         foundSectionNum = num
-                        // Use the full original text as title
                         currentTitle = text
                     }
-                } catch (e: Exception) {
-                    // Ignore parsing error
-                }
+                } catch (e: Exception) {}
             }
             
+            // Fallback: Check without number if regex failed but text looks like a header (e.g. "DATOS CLÍNICOS")
+            // Not implemented to keep it simple, regex is usually enough.
+            
             if (foundSectionNum != null && foundSectionNum > currentSectionNum) {
-                 // Save previous section
                 if (currentSectionNum > 0) {
-                    sections.add(
-                        LeafletSection(number = currentSectionNum, title = currentTitle, content = currentContent.toString())
-                    )
+                    sections.add(LeafletSection(currentSectionNum, currentTitle, currentContent.toString()))
                 }
-                
-                // Start new section
-                currentSectionNum = foundSectionNum!!
+                currentSectionNum = foundSectionNum
                 currentContent = StringBuilder()
-                // We don't add the header itself to content
+                currentTitle = text 
             } else if (currentSectionNum > 0) {
-                // Append content. 
-                // Only append if it's not nested inside another element we already processed.
-                // But Jsoup select returns flat list. 
-                // Issue: If we select 'div' and also 'p' inside it, we get duplication.
-                // Simple fix: Append unique content or just use paragraph tags.
-                // To be safe and simple: Append element's outerHtml IF it's a paragraph or list item.
-                // If it's a strong/b inside a p, the p will catch it.
-                // So we should iterate DIRECT CHILDREN of container for content, searching recursively for headers? No, CIMA is flat usually.
-                
-                // Let's rely on 'p' and 'li' for content.
                 if (element.tagName() in listOf("p", "li", "div")) {
                      currentContent.append(element.outerHtml())
                 }
             }
         }
         
-        // If "flat" iteration failed (maybe structure is nested weirdly), try Child Traversal
-        if (sections.isEmpty() || currentSectionNum == 0) {
-             val children = container.children()
-             for (child in children) {
-                 val text = child.text().trim()
-                 val match = headerRegex.find(text)
-                 // ... same logic ...
-                 // This duplicates logic. Let's stick to the Select approach but filter "block" tags only.
-             }
-        }
-        
-        // Save last section
         if (currentSectionNum > 0) {
-            sections.add(
-                LeafletSection(number = currentSectionNum, title = currentTitle, content = currentContent.toString())
-            )
+            sections.add(LeafletSection(currentSectionNum, currentTitle, currentContent.toString()))
         }
         
         return sections
     }
     
-    // Helper not needed anymore inside parseHtmlLeaflet
-    private fun getSectionNumber(text: String): Int? { return null } // Deprecated helper placeholder
+    private fun getSectionNumberFromText(text: String): Int? {
+        val lower = text.lowercase()
+        // Check for number explicitly first "1. "
+        for (i in 1..6) {
+           if (text.startsWith("$i") && (text.contains(".") || text.contains("-") || text.contains(" "))) {
+               if (isValidSectionTitle(i, lower)) return i
+           }
+        }
+        // Should we check without number? Some indexes are just "Qué es..."
+        if (lower.contains("qué es") || lower.contains("que es")) return 1
+        if (lower.contains("antes de") || lower.contains("necesita saber")) return 2
+        if (lower.contains("cómo tomar") || lower.contains("como usar") || lower.contains("posología")) return 3
+        if (lower.contains("efectos adversos")) return 4
+        if (lower.contains("conservación")) return 5
+        if (lower.contains("contenido del envase") || lower.contains("información adicional")) return 6
+        
+        return null
+    }
+    
+    private fun isValidSectionTitle(num: Int, titlePart: String): Boolean {
+        val lower = titlePart.lowercase()
+        return when (num) {
+            1 -> lower.contains("qué es") || lower.contains("que es")
+            2 -> lower.contains("necesita saber") || lower.contains("antes de") || lower.contains("tenga cuidado")
+            3 -> lower.contains("cómo") || lower.contains("como") || lower.contains("usar")
+            4 -> lower.contains("efectos") || lower.contains("adversos")
+            5 -> lower.contains("conservación") || lower.contains("conservacion")
+            6 -> lower.contains("contenido") || lower.contains("envase") || lower.contains("información")
+            else -> false
+        }
+    }
 
 
     override suspend fun getLeafletSection(registrationNumber: String, section: Int): Result<LeafletSection?> {
