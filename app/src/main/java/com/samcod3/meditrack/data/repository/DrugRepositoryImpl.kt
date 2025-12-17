@@ -52,7 +52,7 @@ class DrugRepositoryImpl(
                              return@withContext Result.success(medication)
                          }
                     }
-                    Result.failure(Exception("Medicamento no encontrado (código: ${response.code()})"))
+                    Result.failure(Exception("No encontrado: $nationalCode"))
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching medication", e)
