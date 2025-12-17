@@ -2,7 +2,6 @@ package com.samcod3.meditrack.ui.screens.leaflet
 
 import android.text.Html
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,24 +15,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,6 +43,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.samcod3.meditrack.R
 import com.samcod3.meditrack.domain.model.LeafletSection
 import com.samcod3.meditrack.domain.model.Medication
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -112,8 +118,6 @@ fun LeafletScreen(
                 LeafletContent(
                     medication = uiState.medication,
                     sections = uiState.sections,
-                    selectedSectionIndex = uiState.selectedSectionIndex,
-                    onSectionSelected = { viewModel.selectSection(it) },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
@@ -127,10 +131,11 @@ fun LeafletScreen(
 private fun LeafletContent(
     medication: Medication?,
     sections: List<LeafletSection>,
-    selectedSectionIndex: Int,
-    onSectionSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    
     Column(modifier = modifier) {
         // Medication info card
         medication?.let {
@@ -142,27 +147,108 @@ private fun LeafletContent(
             )
         }
         
-        // Section tabs
+        // Section dropdown navigator
         if (sections.isNotEmpty()) {
-            SectionTabs(
+            SectionDropdown(
                 sections = sections,
-                selectedIndex = selectedSectionIndex,
-                onSectionSelected = onSectionSelected,
-                modifier = Modifier.fillMaxWidth()
+                onSectionSelected = { index ->
+                    coroutineScope.launch {
+                        // +1 because medication card is at index 0 if present
+                        listState.animateScrollToItem(index)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
             )
             
-            // Section content
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // All sections in a scrollable list
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item {
-                    SectionContent(
-                        section = sections.getOrNull(selectedSectionIndex)
+                itemsIndexed(sections) { index, section ->
+                    SectionCard(
+                        sectionNumber = index + 1,
+                        section = section,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
+                
+                // Bottom spacing
+                item {
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionDropdown(
+    sections: List<LeafletSection>,
+    onSectionSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    Box(modifier = modifier) {
+        OutlinedCard(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Índice del Prospecto",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Selecciona una sección para ir directamente",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Expandir",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(0.9f)
+        ) {
+            sections.forEachIndexed { index, section ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = "${index + 1}. ${section.title}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onSectionSelected(index)
+                    }
+                )
             }
         }
     }
@@ -278,66 +364,51 @@ private fun WarningBadge(
 }
 
 @Composable
-private fun SectionTabs(
-    sections: List<LeafletSection>,
-    selectedIndex: Int,
-    onSectionSelected: (Int) -> Unit,
+private fun SectionCard(
+    sectionNumber: Int,
+    section: LeafletSection,
     modifier: Modifier = Modifier
 ) {
-    LazyRow(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        itemsIndexed(sections) { index, section ->
-            FilterChip(
-                selected = index == selectedIndex,
-                onClick = { onSectionSelected(index) },
-                label = {
-                    Text(
-                        text = "${index + 1}. ${section.title}",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        }
-    }
-}
-
-@Composable
-private fun SectionContent(
-    section: LeafletSection?
-) {
-    if (section == null) {
-        Text(
-            text = "No hay contenido disponible",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        return
-    }
-    
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            Text(
-                text = section.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            // Section header with number badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = sectionNumber.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Text(
+                    text = section.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
             
             Spacer(modifier = Modifier.height(12.dp))
             
