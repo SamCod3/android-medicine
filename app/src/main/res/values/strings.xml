@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">MediTrack</string>
+    
+    <!-- Scanner -->
+    <string name="scanner_title">Escanear Medicamento</string>
+    <string name="scanner_instruction">Apunta al código de barras del medicamento</string>
+    <string name="scanner_permission_denied">Se necesita permiso de cámara para escanear</string>
+    <string name="scanner_grant_permission">Conceder Permiso</string>
+    
+    <!-- Leaflet -->
+    <string name="leaflet_title">Prospecto</string>
+    <string name="leaflet_loading">Cargando prospecto…</string>
+    <string name="leaflet_error">No se pudo cargar el prospecto</string>
+    <string name="leaflet_retry">Reintentar</string>
+    
+    <!-- Sections -->
+    <string name="section_1">Qué es y para qué se utiliza</string>
+    <string name="section_2">Antes de tomar</string>
+    <string name="section_3">Cómo tomar</string>
+    <string name="section_4">Efectos adversos</string>
+    <string name="section_5">Conservación</string>
+    <string name="section_6">Información adicional</string>
+    
+    <!-- General -->
+    <string name="error_generic">Ha ocurrido un error</string>
+    <string name="loading">Cargando…</string>
+    <string name="medication_not_found">Medicamento no encontrado</string>
+    <string name="add_to_profile">Añadir a perfil</string>
+</resources>
