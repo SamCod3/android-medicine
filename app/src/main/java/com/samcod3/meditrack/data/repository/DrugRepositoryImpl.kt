@@ -114,6 +114,34 @@ class DrugRepositoryImpl(
         val doc = Jsoup.parse(html)
         var sections = mutableListOf<LeafletSection>()
         
+        // STRATEGY 0: Semantic IDs (h1 id="1" + section) - Based on user screenshot
+        // The structure is <h1 id="N">Title</h1> <section>Content</section>
+        try {
+            var foundSemantic = false
+            for (i in 1..6) {
+                val id = "$i"
+                val header = doc.getElementById(id)
+                
+                if (header != null && (header.tagName() == "h1" || header.tagName() == "h2" || header.tagName() == "h3")) {
+                    val title = header.text().trim()
+                    val contentElement = header.nextElementSibling()
+                    val content = contentElement?.outerHtml() ?: ""
+                    
+                    if (content.isNotBlank()) {
+                         sections.add(LeafletSection(i, title, content))
+                         foundSemantic = true
+                    }
+                }
+            }
+            
+            if (foundSemantic && sections.size >= 1) {
+                Log.d(TAG, "Using Semantic ID parsing strategy")
+                return sections
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Semantic ID parsing failed", e)
+        }
+        
         // STRATEGY 1: Parse table of contents (Index links)
         // Look for links that point to internal anchors (#) and contain section keywords
         try {
