@@ -29,7 +29,12 @@ data class ReminderEntity(
     val hour: Int,           // 0-23
     val minute: Int,         // 0-59
     val daysOfWeek: Int,     // Bitmask: Mon=1, Tue=2, Wed=4, Thu=8, Fri=16, Sat=32, Sun=64, 0=every day
-    val dosage: String?,     // e.g., "1 comprimido", "5ml"
+    
+    // Structured dosage fields
+    val dosageQuantity: Int = 1,
+    val dosageType: String = "COMPRIMIDO",    // DosageType enum name
+    val dosagePortion: String? = null,         // Portion enum name (only for PORCION type)
+    
     val enabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis()
 ) {
@@ -48,4 +53,48 @@ data class ReminderEntity(
             else (daysOfWeek and dayFlag) != 0
         }
     }
+    
+    /**
+     * Generates the formatted dosage string for display.
+     */
+    fun formatDosage(): String {
+        val type = DosageType.entries.find { it.name == dosageType } ?: DosageType.COMPRIMIDO
+        val portion = dosagePortion?.let { p -> Portion.entries.find { it.name == p } }
+        
+        return when (type) {
+            DosageType.PORCION -> {
+                val portionText = portion?.displayName ?: Portion.ENTERA.displayName
+                "$dosageQuantity ${if (dosageQuantity == 1) type.singular else type.displayName} ($portionText)"
+            }
+            else -> "$dosageQuantity ${if (dosageQuantity == 1) type.singular else type.displayName}"
+        }
+    }
+}
+
+/**
+ * Types of medication dosages.
+ */
+enum class DosageType(val displayName: String, val singular: String) {
+    COMPRIMIDO("comprimidos", "comprimido"),
+    GOTA("gotas", "gota"),
+    CAPSULAS("cápsulas", "cápsula"),
+    CUCHARADA("cucharadas", "cucharada"),
+    CUCHARADITA("cucharaditas", "cucharadita"),
+    ML("ml", "ml"),
+    PORCION("porciones", "porción"),
+    SOBRE("sobres", "sobre"),
+    PARCHE("parches", "parche"),
+    INHALACION("inhalaciones", "inhalación"),
+    APLICACION("aplicaciones", "aplicación")
+}
+
+/**
+ * Portion fractions for divisible medications.
+ */
+enum class Portion(val displayName: String) {
+    ENTERA("Entera"),
+    MEDIA("Media (½)"),
+    CUARTO("Un cuarto (¼)"),
+    TRES_CUARTOS("Tres cuartos (¾)"),
+    MEDIO_CUARTO("Medio cuarto (⅛)")
 }

@@ -2,6 +2,8 @@ package com.samcod3.meditrack.data.repository
 
 import com.samcod3.meditrack.data.local.dao.MedicationDao
 import com.samcod3.meditrack.data.local.dao.ReminderDao
+import com.samcod3.meditrack.data.local.entity.DosageType
+import com.samcod3.meditrack.data.local.entity.Portion
 import com.samcod3.meditrack.data.local.entity.ReminderEntity
 import com.samcod3.meditrack.domain.model.Reminder
 import com.samcod3.meditrack.domain.repository.ReminderRepository
@@ -34,14 +36,18 @@ class ReminderRepositoryImpl(
         hour: Int,
         minute: Int,
         daysOfWeek: Int,
-        dosage: String?
+        dosageQuantity: Int,
+        dosageType: DosageType,
+        dosagePortion: Portion?
     ) {
         val entity = ReminderEntity(
             medicationId = medicationId,
             hour = hour,
             minute = minute,
             daysOfWeek = daysOfWeek,
-            dosage = dosage
+            dosageQuantity = dosageQuantity,
+            dosageType = dosageType.name,
+            dosagePortion = dosagePortion?.name
         )
         reminderDao.insert(entity)
     }
@@ -53,7 +59,9 @@ class ReminderRepositoryImpl(
             hour = reminder.hour,
             minute = reminder.minute,
             daysOfWeek = reminder.daysOfWeek,
-            dosage = reminder.dosage,
+            dosageQuantity = reminder.dosageQuantity,
+            dosageType = reminder.dosageType.name,
+            dosagePortion = reminder.dosagePortion?.name,
             enabled = reminder.enabled
         )
         reminderDao.update(entity)
@@ -76,7 +84,9 @@ class ReminderRepositoryImpl(
             hour = hour,
             minute = minute,
             daysOfWeek = daysOfWeek,
-            dosage = dosage,
+            dosageQuantity = dosageQuantity,
+            dosageType = DosageType.entries.find { it.name == dosageType } ?: DosageType.COMPRIMIDO,
+            dosagePortion = dosagePortion?.let { p -> Portion.entries.find { it.name == p } },
             enabled = enabled
         )
     }

@@ -1,5 +1,8 @@
 package com.samcod3.meditrack.domain.model
 
+import com.samcod3.meditrack.data.local.entity.DosageType
+import com.samcod3.meditrack.data.local.entity.Portion
+
 /**
  * Domain model for a medication reminder.
  */
@@ -10,7 +13,10 @@ data class Reminder(
     val hour: Int,
     val minute: Int,
     val daysOfWeek: Int,
-    val dosage: String?,
+    // Structured dosage
+    val dosageQuantity: Int,
+    val dosageType: DosageType,
+    val dosagePortion: Portion?,
     val enabled: Boolean
 ) {
     val timeFormatted: String
@@ -29,5 +35,17 @@ data class Reminder(
                 if ((daysOfWeek and 32) != 0) append("S ")
                 if ((daysOfWeek and 64) != 0) append("D")
             }.trim()
+        }
+    
+    /**
+     * Formatted dosage string for display.
+     */
+    val dosageFormatted: String
+        get() = when (dosageType) {
+            DosageType.PORCION -> {
+                val portionText = dosagePortion?.displayName ?: Portion.ENTERA.displayName
+                "$dosageQuantity ${if (dosageQuantity == 1) dosageType.singular else dosageType.displayName} ($portionText)"
+            }
+            else -> "$dosageQuantity ${if (dosageQuantity == 1) dosageType.singular else dosageType.displayName}"
         }
 }

@@ -34,7 +34,7 @@ class ReminderAlarmScheduler(private val context: Context) {
             action = ACTION_REMINDER
             putExtra(EXTRA_REMINDER_ID, reminder.id)
             putExtra(EXTRA_MEDICATION_NAME, reminder.medicationName)
-            putExtra(EXTRA_DOSAGE, reminder.dosage)
+            putExtra(EXTRA_DOSAGE, reminder.dosageFormatted)
         }
         
         val pendingIntent = PendingIntent.getBroadcast(

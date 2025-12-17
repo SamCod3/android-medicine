@@ -22,7 +22,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.samcod3.meditrack.data.local.entity.DosageType
+import com.samcod3.meditrack.data.local.entity.Portion
 import com.samcod3.meditrack.domain.model.Reminder
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -110,8 +115,8 @@ fun ReminderScreen(
     if (showAddDialog) {
         AddReminderDialog(
             onDismiss = { viewModel.hideAddReminderDialog() },
-            onConfirm = { hour, minute, dosage ->
-                viewModel.addReminder(hour, minute, 0, dosage) // 0 = every day
+            onConfirm = { hour, minute, quantity, type, portion ->
+                viewModel.addReminder(hour, minute, 0, quantity, type, portion)
             }
         )
     }
@@ -181,13 +186,11 @@ private fun ReminderCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (!reminder.dosage.isNullOrBlank()) {
-                    Text(
-                        text = reminder.dosage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
+                Text(
+                    text = reminder.dosageFormatted,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
             }
             
             Switch(
@@ -212,13 +215,19 @@ private fun ReminderCard(
 @Composable
 private fun AddReminderDialog(
     onDismiss: () -> Unit,
-    onConfirm: (hour: Int, minute: Int, dosage: String?) -> Unit
+    onConfirm: (hour: Int, minute: Int, quantity: Int, type: DosageType, portion: Portion?) -> Unit
 ) {
     val timePickerState = rememberTimePickerState(
         initialHour = 8,
         initialMinute = 0
     )
-    var dosage by remember { mutableStateOf("") }
+    
+    // Dosage state
+    var quantity by remember { mutableStateOf("1") }
+    var selectedDosageType by remember { mutableStateOf(DosageType.COMPRIMIDO) }
+    var selectedPortion by remember { mutableStateOf(Portion.ENTERA) }
+    var expandedType by remember { mutableStateOf(false) }
+    var expandedPortion by remember { mutableStateOf(false) }
     
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -229,22 +238,106 @@ private fun AddReminderDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                OutlinedTextField(
-                    value = dosage,
-                    onValueChange = { dosage = it },
-                    label = { Text("Dosis (opcional)") },
-                    placeholder = { Text("Ej: 1 comprimido") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                Text(
+                    text = "Dosis",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
                 )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Quantity input
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = quantity,
+                        onValueChange = { if (it.all { c -> c.isDigit() } && it.length <= 3) quantity = it },
+                        label = { Text("Cantidad") },
+                        modifier = Modifier.width(100.dp),
+                        singleLine = true
+                    )
+                    
+                    // Dosage type dropdown
+                    ExposedDropdownMenuBox(
+                        expanded = expandedType,
+                        onExpandedChange = { expandedType = it },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        OutlinedTextField(
+                            value = selectedDosageType.displayName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Tipo") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedType) },
+                            modifier = Modifier.menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedType,
+                            onDismissRequest = { expandedType = false }
+                        ) {
+                            DosageType.entries.forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(type.displayName) },
+                                    onClick = {
+                                        selectedDosageType = type
+                                        expandedType = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Show portion selector for applicable types
+                if (selectedDosageType == DosageType.PORCION) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    ExposedDropdownMenuBox(
+                        expanded = expandedPortion,
+                        onExpandedChange = { expandedPortion = it },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = selectedPortion.displayName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Fracción") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPortion) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedPortion,
+                            onDismissRequest = { expandedPortion = false }
+                        ) {
+                            Portion.entries.forEach { portion ->
+                                DropdownMenuItem(
+                                    text = { Text(portion.displayName) },
+                                    onClick = {
+                                        selectedPortion = portion
+                                        expandedPortion = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(onClick = {
+                val qty = quantity.toIntOrNull() ?: 1
+                val portion = if (selectedDosageType == DosageType.PORCION) selectedPortion else null
                 onConfirm(
                     timePickerState.hour,
                     timePickerState.minute,
-                    dosage.ifBlank { null }
+                    qty,
+                    selectedDosageType,
+                    portion
                 )
             }) {
                 Text("Guardar")
