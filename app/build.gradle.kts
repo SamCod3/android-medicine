@@ -91,4 +91,7 @@ dependencies {
     
     // Accompanist
     implementation(libs.accompanist.permissions)
+    
+    // Jsoup
+    implementation(libs.jsoup)
 }

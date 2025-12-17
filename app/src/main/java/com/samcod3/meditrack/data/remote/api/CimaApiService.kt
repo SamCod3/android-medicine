@@ -35,5 +35,8 @@ interface CimaApiService {
         @Query("nregistro") registrationNumber: String,
         @Query("seccion") section: Int
     ): Response<LeafletSectionDto>
+    
+    @GET
+    suspend fun downloadUrl(@retrofit2.http.Url url: String): Response<okhttp3.ResponseBody>
 }
 

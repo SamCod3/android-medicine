@@ -45,8 +45,8 @@ class LeafletViewModel(
                 val medication = medicationResult.getOrThrow()
                 _uiState.value = _uiState.value.copy(medication = medication)
                 
-                // Then load leaflet sections
-                val leafletResult = drugRepository.getLeaflet(medication.registrationNumber)
+                // Then load leaflet sections using medication object (for URL fallback)
+                val leafletResult = drugRepository.getLeaflet(medication)
                 
                 if (leafletResult.isSuccess) {
                     val leaflet = leafletResult.getOrThrow()
