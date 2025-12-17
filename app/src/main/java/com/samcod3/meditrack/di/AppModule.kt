@@ -1,5 +1,6 @@
 package com.samcod3.meditrack.di
 
+import com.samcod3.meditrack.ui.screens.home.HomeViewModel
 import com.samcod3.meditrack.ui.screens.leaflet.LeafletViewModel
 import com.samcod3.meditrack.ui.screens.profiles.ProfileViewModel
 import com.samcod3.meditrack.ui.screens.scanner.ScannerViewModel
@@ -21,4 +22,11 @@ val appModule = module {
     }
     viewModel { ProfileViewModel(get()) }
     viewModel { SearchViewModel(get()) }
+    // HomeViewModel needs: profileId, userMedicationRepo
+    viewModel { params -> 
+        HomeViewModel(
+            profileId = params[0],
+            userMedicationRepository = get()
+        )
+    }
 }
