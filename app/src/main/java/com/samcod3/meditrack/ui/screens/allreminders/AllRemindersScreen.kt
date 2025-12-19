@@ -48,11 +48,12 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AllRemindersScreen(
+    profileId: String,
     profileName: String,
     onChangeProfile: () -> Unit,
     onReminderClick: (medicationId: String, medicationName: String) -> Unit,
     onTreatmentClick: () -> Unit,
-    viewModel: AllRemindersViewModel = koinViewModel()
+    viewModel: AllRemindersViewModel = koinViewModel { org.koin.core.parameter.parametersOf(profileId) }
 ) {
     val todayReminders by viewModel.todayReminders.collectAsState()
     val totalReminders by viewModel.totalReminders.collectAsState()

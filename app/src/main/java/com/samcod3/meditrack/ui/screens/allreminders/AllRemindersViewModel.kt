@@ -16,14 +16,15 @@ import java.util.Calendar
  * Shows all enabled reminders grouped by time.
  */
 class AllRemindersViewModel(
+    private val profileId: String,
     private val reminderRepository: ReminderRepository
 ) : ViewModel() {
     
     /**
-     * All enabled reminders grouped by hour:minute, sorted by time.
+     * Enabled reminders for current profile grouped by hour:minute, sorted by time.
      */
     val remindersByTime: StateFlow<Map<String, List<Reminder>>> = reminderRepository
-        .getAllEnabledReminders()
+        .getEnabledRemindersForProfile(profileId)
         .map { reminders ->
             reminders
                 .sortedWith(compareBy({ it.hour }, { it.minute }))
@@ -36,10 +37,10 @@ class AllRemindersViewModel(
         )
     
     /**
-     * Total count of enabled reminders.
+     * Total count of enabled reminders for current profile.
      */
     val totalReminders: StateFlow<Int> = reminderRepository
-        .getAllEnabledReminders()
+        .getEnabledRemindersForProfile(profileId)
         .map { it.size }
         .stateIn(
             scope = viewModelScope,
@@ -48,10 +49,10 @@ class AllRemindersViewModel(
         )
     
     /**
-     * Get reminders that should fire today based on schedule type.
+     * Get reminders for current profile that should fire today based on schedule type.
      */
     val todayReminders: StateFlow<List<Reminder>> = reminderRepository
-        .getAllEnabledReminders()
+        .getEnabledRemindersForProfile(profileId)
         .map { reminders ->
             val today = Calendar.getInstance()
             val dayOfWeek = when (today.get(Calendar.DAY_OF_WEEK)) {

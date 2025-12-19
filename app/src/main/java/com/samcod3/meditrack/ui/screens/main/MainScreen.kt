@@ -80,6 +80,7 @@ fun MainScreen(
         ) {
             when (selectedTab) {
                 0 -> AllRemindersScreen(
+                    profileId = profileId,
                     profileName = profileName,
                     onChangeProfile = onChangeProfile,
                     onReminderClick = onReminderClick,

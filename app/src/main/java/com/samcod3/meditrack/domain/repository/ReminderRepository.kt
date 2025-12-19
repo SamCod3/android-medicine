@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 interface ReminderRepository {
     fun getRemindersForMedication(medicationId: String): Flow<List<Reminder>>
     fun getAllEnabledReminders(): Flow<List<Reminder>>
+    fun getEnabledRemindersForProfile(profileId: String): Flow<List<Reminder>>
     suspend fun getReminderById(id: String): Reminder?
     suspend fun createReminder(
         medicationId: String, 

@@ -42,8 +42,13 @@ val appModule = module {
             reminderRepository = get()
         )
     }
-    // AllRemindersViewModel for global agenda view
-    viewModel { AllRemindersViewModel(get()) }
+    // AllRemindersViewModel for agenda view (filtered by profile)
+    viewModel { params ->
+        AllRemindersViewModel(
+            profileId = params[0],
+            reminderRepository = get()
+        )
+    }
     // MyTreatmentViewModel for treatment summary
     viewModel { MyTreatmentViewModel(get()) }
 }
