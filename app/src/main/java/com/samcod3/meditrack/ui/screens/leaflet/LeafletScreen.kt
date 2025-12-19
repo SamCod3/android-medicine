@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
@@ -69,6 +71,7 @@ import com.samcod3.meditrack.domain.model.LeafletSection
 import com.samcod3.meditrack.domain.model.Medication
 import com.samcod3.meditrack.domain.model.Reminder
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.snapshotFlow
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -271,6 +274,7 @@ private fun LeafletContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .statusBarsPadding()
                             .padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -307,6 +311,16 @@ private fun LeafletContent(
                 )
                 
                 HorizontalDivider()
+                
+                // Update selectedSectionIndex when scrolling
+                LaunchedEffect(readingListState) {
+                    snapshotFlow { readingListState.firstVisibleItemIndex }
+                        .collect { index ->
+                            if (index in sections.indices) {
+                                selectedSectionIndex = index
+                            }
+                        }
+                }
                 
                 // Scrollable content
                 LazyColumn(
@@ -381,9 +395,9 @@ private fun SectionIndexItem(
             )
             
             Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "Leer",
+                tint = MaterialTheme.colorScheme.primary
             )
         }
     }
