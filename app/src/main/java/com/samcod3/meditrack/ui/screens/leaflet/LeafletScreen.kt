@@ -23,9 +23,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -177,6 +179,7 @@ fun LeafletScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LeafletContent(
     medication: Medication?,
@@ -186,306 +189,358 @@ private fun LeafletContent(
     onManageReminders: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val listState = rememberLazyListState()
+    // State for reading mode
+    var isReadingMode by remember { mutableStateOf(false) }
+    var selectedSectionIndex by remember { mutableStateOf(0) }
+    val readingSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val readingListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     
-    // Calculate header items count for index adjustment
-    // Items before sections: Spacer(implicit), MyDosageSection?, MedicationInfoCard?, SectionDropdown
-    val headerItemsCount = run {
-        var count = 0
-        if (savedMedicationId != null) count++ // MyDosageSection
-        if (medication != null) count++ // MedicationInfoCard
-        if (sections.isNotEmpty()) count++ // SectionDropdown
-        count
-    }
-    
-    // Track current visible section (accounting for header items)
-    val firstVisibleItemIndex = listState.firstVisibleItemIndex
-    val currentSectionIndex = (firstVisibleItemIndex - headerItemsCount).coerceIn(0, sections.lastIndex.coerceAtLeast(0))
-    
-    if (sections.isNotEmpty()) {
-        // All content in a single scrollable LazyColumn
-        LazyColumn(
-            state = listState,
-            modifier = modifier,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // My dosages section (if saved)
-            if (savedMedicationId != null) {
-                item(key = "my_dosage") {
-                    MyDosageSection(
-                        dosages = myDosages,
-                        onAddReminder = onManageReminders,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-            
-            // Medication info card
-            if (medication != null) {
-                item(key = "medication_info") {
-                    MedicationInfoCard(
-                        medication = medication,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-            
-            // Section index dropdown
-            item(key = "section_dropdown") {
-                SectionDropdown(
-                    sections = sections,
-                    currentSectionIndex = currentSectionIndex,
-                    onSectionSelected = { index ->
-                        coroutineScope.launch {
-                            // Scroll to section (add header items offset)
-                            listState.animateScrollToItem(index + headerItemsCount)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            
-            // All leaflet sections
-            itemsIndexed(
-                items = sections,
-                key = { index, section -> "section_$index" }
-            ) { index, section ->
-                SectionCard(
-                    sectionNumber = index + 1,
-                    section = section,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            
-            // Bottom spacing for FAB
-            item(key = "bottom_spacer") {
-                Spacer(modifier = Modifier.height(80.dp))
-            }
+    // Normal view: Info cards + Section selector
+    Column(
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // My dosages section (if saved)
+        if (savedMedicationId != null) {
+            MyDosageSection(
+                dosages = myDosages,
+                onAddReminder = onManageReminders,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
-    } else {
-        // Fallback for when segmented content is not available
-        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-        Column(
-            modifier = modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Show header cards even without sections
-            if (savedMedicationId != null) {
-                MyDosageSection(
-                    dosages = myDosages,
-                    onAddReminder = onManageReminders,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            
-            medication?.let {
-                MedicationInfoCard(
-                    medication = it,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.secondary
+        
+        // Medication info card
+        medication?.let {
+            MedicationInfoCard(
+                medication = it,
+                modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "No se pudo cargar el formato de lectura rápida.",
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center
-            )
+        }
+        
+        // Section index - opens reading mode when selected
+        if (sections.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
+            
             Text(
-                text = "El prospecto no está disponible por secciones.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                text = "Prospecto",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
             
-            if (!medication?.leafletUrl.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = { 
-                        try {
-                            uriHandler.openUri(medication!!.leafletUrl!!) 
-                        } catch (e: Exception) {
-                            // Ignore
+            // Section list as clickable items
+            sections.forEachIndexed { index, section ->
+                SectionIndexItem(
+                    sectionNumber = index + 1,
+                    title = cleanSectionTitle(section.title),
+                    onClick = {
+                        selectedSectionIndex = index
+                        isReadingMode = true
+                        coroutineScope.launch {
+                            readingListState.scrollToItem(0)
                         }
                     }
+                )
+            }
+        } else {
+            // Fallback for when segmented content is not available
+            NoSectionsAvailable(medication)
+        }
+        
+        // Bottom spacing for FAB
+        Spacer(modifier = Modifier.height(80.dp))
+    }
+    
+    // Reading mode BottomSheet
+    if (isReadingMode && sections.isNotEmpty()) {
+        ModalBottomSheet(
+            onDismissRequest = { isReadingMode = false },
+            sheetState = readingSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = null // Custom header instead
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Custom header with close button and medication name
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    tonalElevation = 2.dp
                 ) {
-                    Text("Ver Prospecto Oficial (Web)")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { isReadingMode = false }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cerrar",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        
+                        Text(
+                            text = medication?.name ?: "Prospecto",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                
+                // Section navigation
+                ReadingSectionSelector(
+                    sections = sections,
+                    currentIndex = selectedSectionIndex,
+                    onSectionSelected = { index ->
+                        selectedSectionIndex = index
+                        coroutineScope.launch {
+                            readingListState.animateScrollToItem(index)
+                        }
+                    }
+                )
+                
+                HorizontalDivider()
+                
+                // Scrollable content
+                LazyColumn(
+                    state = readingListState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    itemsIndexed(sections) { index, section ->
+                        SectionCard(
+                            sectionNumber = index + 1,
+                            section = section,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    
+                    item {
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Helper to clean section titles
+private fun cleanSectionTitle(title: String): String {
+    return title.replace(Regex("^\\d+\\.?\\d*\\.?\\s*"), "").trim()
+}
+
 @Composable
-private fun SectionDropdown(
-    sections: List<LeafletSection>,
-    currentSectionIndex: Int,
-    onSectionSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier
+private fun SectionIndexItem(
+    sectionNumber: Int,
+    title: String,
+    onClick: () -> Unit
 ) {
-    var showBottomSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val currentSection = sections.getOrNull(currentSectionIndex)
-    
-    // Clean title: remove leading numbers like "1.1" or "1."
-    fun cleanTitle(title: String): String {
-        return title.replace(Regex("^\\d+\\.?\\d*\\.?\\s*"), "").trim()
-    }
-    
-    // Index button card
-    OutlinedCard(
-        onClick = { showBottomSheet = true },
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp)
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "Sección ${currentSectionIndex + 1} de ${sections.size}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = cleanTitle(currentSection?.title ?: "Ver índice"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = sectionNumber.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary
                 )
             }
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Ver índice",
-                tint = MaterialTheme.colorScheme.primary
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
+}
+
+@Composable
+private fun ReadingSectionSelector(
+    sections: List<LeafletSection>,
+    currentIndex: Int,
+    onSectionSelected: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val currentSection = sections.getOrNull(currentIndex)
     
-    // Full-screen ModalBottomSheet for index
-    if (showBottomSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showBottomSheet = false },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
-            dragHandle = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .width(40.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.outlineVariant)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Índice del Prospecto",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider()
-                }
-            }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Current section header (clickable to expand)
+        Surface(
+            onClick = { expanded = !expanded },
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 8.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                itemsIndexed(sections) { index, section ->
-                    val isCurrentSection = index == currentSectionIndex
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${currentIndex + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Text(
+                    text = cleanSectionTitle(currentSection?.title ?: ""),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Cambiar sección"
+                )
+            }
+        }
+        
+        // Expanded section list
+        androidx.compose.animation.AnimatedVisibility(visible = expanded) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
+                sections.forEachIndexed { index, section ->
+                    val isSelected = index == currentIndex
                     Surface(
                         onClick = {
-                            showBottomSheet = false
+                            expanded = false
                             onSectionSelected(index)
                         },
-                        color = if (isCurrentSection) 
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        color = if (isSelected) 
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) 
                         else 
-                            Color.Transparent,
+                            MaterialTheme.colorScheme.surface,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 14.dp),
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Section number badge
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (isCurrentSection)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "${index + 1}",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isCurrentSection)
-                                        MaterialTheme.colorScheme.onPrimary
-                                    else
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = "${index + 1}.",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(24.dp)
+                            )
                             
                             Text(
-                                text = cleanTitle(section.title),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (isCurrentSection) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isCurrentSection)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
+                                text = cleanSectionTitle(section.title),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                     
                     if (index < sections.lastIndex) {
                         HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 24.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                     }
                 }
-                
-                // Bottom spacing
-                item {
-                    Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoSectionsAvailable(medication: Medication?) {
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.Warning,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.secondary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "No se pudo cargar el formato de lectura rápida.",
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "El prospecto no está disponible por secciones.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        
+        if (!medication?.leafletUrl.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = { 
+                    try {
+                        uriHandler.openUri(medication!!.leafletUrl!!) 
+                    } catch (e: Exception) {
+                        // Ignore
+                    }
                 }
+            ) {
+                Text("Ver Prospecto Oficial (Web)")
             }
         }
     }
