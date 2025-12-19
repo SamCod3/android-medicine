@@ -12,14 +12,16 @@ import org.koin.dsl.module
 
 val appModule = module {
     viewModel { ScannerViewModel() }
-    // LeafletViewModel needs: nationalCode, profileId, drugRepo, userMedRepo
+    // LeafletViewModel needs: nationalCode, profileId, drugRepo, userMedRepo, reminderRepo, medDao
     // params[0] = nationalCode, params[1] = profileId
     viewModel { params -> 
         LeafletViewModel(
             nationalCode = params[0], 
             profileId = params[1], 
             drugRepository = get(), 
-            userMedicationRepository = get()
+            userMedicationRepository = get(),
+            reminderRepository = get(),
+            medicationDao = get()
         ) 
     }
     viewModel { ProfileViewModel(get()) }

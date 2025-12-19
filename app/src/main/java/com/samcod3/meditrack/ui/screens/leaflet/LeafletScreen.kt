@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import com.samcod3.meditrack.R
 import com.samcod3.meditrack.domain.model.LeafletSection
 import com.samcod3.meditrack.domain.model.Medication
+import com.samcod3.meditrack.domain.model.Reminder
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -143,6 +144,7 @@ fun LeafletScreen(
                 LeafletContent(
                     medication = uiState.medication,
                     sections = uiState.sections,
+                    myDosages = uiState.myDosages,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
@@ -156,19 +158,30 @@ fun LeafletScreen(
 private fun LeafletContent(
     medication: Medication?,
     sections: List<LeafletSection>,
+    myDosages: List<Reminder>,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     
     Column(modifier = modifier) {
+        // My dosages section (if saved and has reminders)
+        if (myDosages.isNotEmpty()) {
+            MyDosageSection(
+                dosages = myDosages,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            )
+        }
+        
         // Medication info card
         medication?.let {
             MedicationInfoCard(
                 medication = it,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp)
             )
         }
         
@@ -543,6 +556,72 @@ private fun ErrorState(
             
             Button(onClick = onRetry) {
                 Text(stringResource(R.string.leaflet_retry))
+            }
+        }
+    }
+}
+
+@Composable
+private fun MyDosageSection(
+    dosages: List<Reminder>,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Mi Dosis",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            dosages.forEach { reminder ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text(
+                        text = "${reminder.dosageFormatted} a las ${reminder.timeFormatted}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+                Text(
+                    text = reminder.scheduleFormatted,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(start = 20.dp)
+                )
             }
         }
     }

@@ -2,19 +2,25 @@ package com.samcod3.meditrack.ui.screens.leaflet
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.samcod3.meditrack.domain.repository.DrugRepository
+import com.samcod3.meditrack.data.local.dao.MedicationDao
 import com.samcod3.meditrack.domain.model.LeafletSection
 import com.samcod3.meditrack.domain.model.Medication
+import com.samcod3.meditrack.domain.model.Reminder
+import com.samcod3.meditrack.domain.repository.DrugRepository
+import com.samcod3.meditrack.domain.repository.ReminderRepository
 import com.samcod3.meditrack.domain.repository.UserMedicationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class LeafletUiState(
     val isLoading: Boolean = true,
     val medication: Medication? = null,
     val sections: List<LeafletSection> = emptyList(),
+    val myDosages: List<Reminder> = emptyList(), // User's saved dosage/reminders
+    val savedMedicationId: String? = null,       // ID if medication is saved
     val error: String? = null,
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false
@@ -24,7 +30,9 @@ class LeafletViewModel(
     private val nationalCode: String,
     private val profileId: String,
     private val drugRepository: DrugRepository,
-    private val userMedicationRepository: UserMedicationRepository
+    private val userMedicationRepository: UserMedicationRepository,
+    private val reminderRepository: ReminderRepository,
+    private val medicationDao: MedicationDao
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(LeafletUiState())
@@ -50,6 +58,9 @@ class LeafletViewModel(
                 val medication = medicationResult.getOrThrow()
                 _uiState.value = _uiState.value.copy(medication = medication)
                 
+                // Check if medication is saved and load its reminders
+                loadSavedMedicationInfo(medication.nationalCode ?: nationalCode)
+                
                 // Then load leaflet sections using medication object (for URL fallback)
                 val leafletResult = drugRepository.getLeaflet(medication)
                 
@@ -74,6 +85,17 @@ class LeafletViewModel(
         }
     }
     
+    private suspend fun loadSavedMedicationInfo(code: String) {
+        val savedMedication = medicationDao.getMedicationByNationalCodeAndProfile(code, profileId)
+        if (savedMedication != null) {
+            _uiState.value = _uiState.value.copy(savedMedicationId = savedMedication.id)
+            
+            // Load reminders for this medication
+            val reminders = reminderRepository.getRemindersForMedication(savedMedication.id).first()
+            _uiState.value = _uiState.value.copy(myDosages = reminders)
+        }
+    }
+    
     fun saveMedication() {
         val medication = _uiState.value.medication ?: return
         
@@ -89,7 +111,11 @@ class LeafletViewModel(
             )
             
             if (result.isSuccess) {
-                _uiState.value = _uiState.value.copy(isSaving = false, saveSuccess = true)
+                _uiState.value = _uiState.value.copy(
+                    isSaving = false, 
+                    saveSuccess = true,
+                    savedMedicationId = result.getOrNull()
+                )
             } else {
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,

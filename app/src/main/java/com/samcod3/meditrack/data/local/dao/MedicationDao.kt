@@ -19,6 +19,9 @@ interface MedicationDao {
     
     @Query("SELECT * FROM medications WHERE id = :id")
     suspend fun getMedicationById(id: String): MedicationEntity?
+    
+    @Query("SELECT * FROM medications WHERE nationalCode = :nationalCode AND profileId = :profileId AND active = 1 LIMIT 1")
+    suspend fun getMedicationByNationalCodeAndProfile(nationalCode: String, profileId: String): MedicationEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMedication(medication: MedicationEntity)
