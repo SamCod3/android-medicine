@@ -437,18 +437,23 @@ private fun cleanOcrText(rawText: String): String {
         .filter { it.length >= 3 } // Filter out very short lines
     
     // Try to find the most likely medication name line
-    // Usually the first line that's mostly alphabetic and not too long
+    // Prioritize lines that are MOSTLY alphabetic (to avoid CN numbers)
+    // but can contain some digits (for dosage like "10 mg")
     val candidateLine = lines.firstOrNull { line ->
-        val alphaRatio = line.count { it.isLetter() || it.isWhitespace() }.toFloat() / line.length
-        alphaRatio > 0.7 && line.length in 3..60
-    } ?: lines.firstOrNull() ?: rawText
+        val letterCount = line.count { it.isLetter() }
+        val digitCount = line.count { it.isDigit() }
+        // Must have more letters than digits (name, not CN)
+        // and reasonable length
+        letterCount > digitCount && letterCount >= 3 && line.length in 3..60
+    } ?: lines.firstOrNull { it.any { c -> c.isLetter() } } ?: rawText
     
-    // Clean the line: remove numbers and special chars, keep letters and spaces
+    // Clean the line: keep letters, spaces, and digits (for dosage like "10 mg")
+    // Remove only special chars that aren't useful for medication names
     return candidateLine
-        .replace(Regex("[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\\s]"), " ")
+        .replace(Regex("[^a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ\\s.,/-]"), " ")
         .replace(Regex("\\s+"), " ")
         .trim()
-        .take(50) // Limit length
+        .take(60) // Limit length
 }
 
 @Composable
