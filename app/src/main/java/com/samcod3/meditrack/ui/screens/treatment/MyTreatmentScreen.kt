@@ -5,6 +5,10 @@ import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,6 +28,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Today
@@ -40,6 +46,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -108,89 +117,133 @@ fun MyTreatmentScreen(
         if (treatment.totalCount == 0) {
             EmptyTreatmentMessage(modifier = Modifier.padding(paddingValues))
         } else {
+            // Expansion states for each group
+            var dailyExpanded by remember { mutableStateOf(true) }
+            var weeklyExpanded by remember { mutableStateOf(true) }
+            var monthlyExpanded by remember { mutableStateOf(true) }
+            var intervalExpanded by remember { mutableStateOf(true) }
+            
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // DAILY
                 if (treatment.daily.isNotEmpty()) {
-                    item {
-                        ScheduleGroupHeader(
+                    item(key = "daily-header") {
+                        CollapsibleScheduleHeader(
                             icon = Icons.Default.Today,
                             title = "Todos los días",
                             count = treatment.daily.size,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
+                            isExpanded = dailyExpanded,
+                            onToggle = { dailyExpanded = !dailyExpanded }
                         )
                     }
-                    items(treatment.daily, key = { "daily-${it.id}" }) { reminder ->
-                        TreatmentReminderCard(reminder = reminder)
+                    
+                    if (dailyExpanded) {
+                        // Group by medication name (base name without dosage)
+                        val groupedDaily = treatment.daily.sortedBy { extractBaseName(it.medicationName) }
+                        items(groupedDaily, key = { "daily-${it.id}" }) { reminder ->
+                            TreatmentReminderCard(reminder = reminder)
+                        }
                     }
                 }
                 
-                // WEEKLY - grouped by days
+                // WEEKLY
                 if (treatment.weekly.isNotEmpty()) {
-                    item {
-                        ScheduleGroupHeader(
+                    item(key = "weekly-header") {
+                        CollapsibleScheduleHeader(
                             icon = Icons.Default.CalendarToday,
                             title = "Semanalmente",
                             count = treatment.weekly.values.sumOf { it.size },
-                            color = MaterialTheme.colorScheme.secondary
+                            color = MaterialTheme.colorScheme.secondary,
+                            isExpanded = weeklyExpanded,
+                            onToggle = { weeklyExpanded = !weeklyExpanded }
                         )
                     }
-                    treatment.weekly.forEach { (days, reminders) ->
-                        item {
-                            Text(
-                                text = days,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.secondary,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(start = 8.dp, top = 4.dp)
-                            )
-                        }
-                        items(reminders, key = { "weekly-${it.id}" }) { reminder ->
-                            TreatmentReminderCard(
-                                reminder = reminder,
-                                showSchedule = false // Already shown in header
-                            )
+                    
+                    if (weeklyExpanded) {
+                        treatment.weekly.forEach { (days, reminders) ->
+                            item(key = "weekly-days-$days") {
+                                Text(
+                                    text = days,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+                                )
+                            }
+                            val sortedReminders = reminders.sortedBy { extractBaseName(it.medicationName) }
+                            items(sortedReminders, key = { "weekly-${it.id}" }) { reminder ->
+                                TreatmentReminderCard(
+                                    reminder = reminder,
+                                    showSchedule = false
+                                )
+                            }
                         }
                     }
                 }
                 
                 // MONTHLY
                 if (treatment.monthly.isNotEmpty()) {
-                    item {
-                        ScheduleGroupHeader(
+                    item(key = "monthly-header") {
+                        CollapsibleScheduleHeader(
                             icon = Icons.Default.CalendarMonth,
                             title = "Mensualmente",
                             count = treatment.monthly.size,
-                            color = MaterialTheme.colorScheme.tertiary
+                            color = MaterialTheme.colorScheme.tertiary,
+                            isExpanded = monthlyExpanded,
+                            onToggle = { monthlyExpanded = !monthlyExpanded }
                         )
                     }
-                    items(treatment.monthly, key = { "monthly-${it.id}" }) { reminder ->
-                        TreatmentReminderCard(reminder = reminder)
+                    
+                    if (monthlyExpanded) {
+                        val groupedMonthly = treatment.monthly.sortedBy { extractBaseName(it.medicationName) }
+                        items(groupedMonthly, key = { "monthly-${it.id}" }) { reminder ->
+                            TreatmentReminderCard(reminder = reminder)
+                        }
                     }
                 }
                 
                 // INTERVAL
                 if (treatment.interval.isNotEmpty()) {
-                    item {
-                        ScheduleGroupHeader(
+                    item(key = "interval-header") {
+                        CollapsibleScheduleHeader(
                             icon = Icons.Default.EventRepeat,
                             title = "Por intervalo",
                             count = treatment.interval.size,
-                            color = MaterialTheme.colorScheme.error
+                            color = MaterialTheme.colorScheme.error,
+                            isExpanded = intervalExpanded,
+                            onToggle = { intervalExpanded = !intervalExpanded }
                         )
                     }
-                    items(treatment.interval, key = { "interval-${it.id}" }) { reminder ->
-                        TreatmentReminderCard(reminder = reminder)
+                    
+                    if (intervalExpanded) {
+                        val groupedInterval = treatment.interval.sortedBy { extractBaseName(it.medicationName) }
+                        items(groupedInterval, key = { "interval-${it.id}" }) { reminder ->
+                            TreatmentReminderCard(reminder = reminder)
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * Extracts the base medication name (without dosage numbers) for grouping.
+ * E.g., "Ibuprofeno 600mg" -> "Ibuprofeno"
+ */
+private fun extractBaseName(medicationName: String): String {
+    // Remove common dosage patterns like "600mg", "1000 mg", "20 mcg", etc.
+    return medicationName
+        .replace(Regex("\\s*\\d+\\s*(mg|mcg|ml|g|ui|iu)\\b", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("\\s*\\d+[,.]\\d+\\s*(mg|mcg|ml|g)\\b", RegexOption.IGNORE_CASE), "")
+        .trim()
+        .uppercase()
 }
 
 @Composable
@@ -224,14 +277,18 @@ private fun EmptyTreatmentMessage(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ScheduleGroupHeader(
+private fun CollapsibleScheduleHeader(
     icon: ImageVector,
     title: String,
     count: Int,
-    color: Color
+    color: Color,
+    isExpanded: Boolean,
+    onToggle: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggle() },
         colors = CardDefaults.cardColors(
             containerColor = color.copy(alpha = 0.15f)
         ),
@@ -257,17 +314,32 @@ private fun ScheduleGroupHeader(
                 color = color,
                 modifier = Modifier.weight(1f)
             )
+            
+            // Count badge with better contrast
             Card(
-                colors = CardDefaults.cardColors(containerColor = color),
+                colors = CardDefaults.cardColors(
+                    containerColor = color
+                ),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
                     text = "$count",
                     style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
                     color = Color.White,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                 )
             }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // Expand/collapse arrow
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (isExpanded) "Colapsar" else "Expandir",
+                tint = color,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
@@ -407,7 +479,7 @@ private fun shareTreatmentAsPdf(
             canvas.drawText("📅 TODOS LOS DÍAS (${treatment.daily.size})", leftMargin, yPosition, headerPaint)
             yPosition += 20f
             
-            treatment.daily.forEach { reminder ->
+            treatment.daily.sortedBy { extractBaseName(it.medicationName) }.forEach { reminder ->
                 canvas.drawText("• ${reminder.medicationName}", leftMargin + 15, yPosition, bodyPaint)
                 yPosition += lineHeight
                 canvas.drawText("  ${reminder.dosageFormatted} - ${reminder.timeFormatted}", leftMargin + 15, yPosition, lightPaint)
@@ -426,7 +498,7 @@ private fun shareTreatmentAsPdf(
                 canvas.drawText(days, leftMargin + 15, yPosition, bodyPaint)
                 yPosition += lineHeight
                 
-                reminders.forEach { reminder ->
+                reminders.sortedBy { extractBaseName(it.medicationName) }.forEach { reminder ->
                     canvas.drawText("  • ${reminder.medicationName}", leftMargin + 20, yPosition, bodyPaint)
                     yPosition += lineHeight
                     canvas.drawText("    ${reminder.dosageFormatted} - ${reminder.timeFormatted}", leftMargin + 20, yPosition, lightPaint)
@@ -441,7 +513,7 @@ private fun shareTreatmentAsPdf(
             canvas.drawText("📅 MENSUALMENTE (${treatment.monthly.size})", leftMargin, yPosition, headerPaint)
             yPosition += 20f
             
-            treatment.monthly.forEach { reminder ->
+            treatment.monthly.sortedBy { extractBaseName(it.medicationName) }.forEach { reminder ->
                 canvas.drawText("• ${reminder.medicationName}", leftMargin + 15, yPosition, bodyPaint)
                 yPosition += lineHeight
                 canvas.drawText("  ${reminder.dosageFormatted} - ${reminder.scheduleFormatted} - ${reminder.timeFormatted}", leftMargin + 15, yPosition, lightPaint)
@@ -455,7 +527,7 @@ private fun shareTreatmentAsPdf(
             canvas.drawText("🔄 POR INTERVALO (${treatment.interval.size})", leftMargin, yPosition, headerPaint)
             yPosition += 20f
             
-            treatment.interval.forEach { reminder ->
+            treatment.interval.sortedBy { extractBaseName(it.medicationName) }.forEach { reminder ->
                 canvas.drawText("• ${reminder.medicationName}", leftMargin + 15, yPosition, bodyPaint)
                 yPosition += lineHeight
                 canvas.drawText("  ${reminder.dosageFormatted} - ${reminder.scheduleFormatted}", leftMargin + 15, yPosition, lightPaint)
