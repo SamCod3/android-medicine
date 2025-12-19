@@ -85,44 +85,29 @@ object BarcodeExtractor {
     }
     
     /**
-     * Finds National Code in OCR text.
-     * Looks for explicit CN labels, GTIN patterns, or isolated 6-7 digit numbers.
+     * Finds National Code from OCR text.
+     * Simplified to only look for explicit CN labels: "C.N. 123456" or "CN: 123456.7"
      */
     fun findCNInText(text: String): String? {
-        Log.d(TAG, "Scanning OCR text for CN")
+        Log.d(TAG, "Scanning OCR text for CN label")
         
-        // 1. Explicit CN label: "CN: 123456" or "C.N. 123456.7"
-        val cnLabelRegex = Regex("""(?:C\.?N\.?|C\.N)\s*[:\.]?\s*(\d{6,7})""", RegexOption.IGNORE_CASE)
-        val matchLabel = cnLabelRegex.find(text)
-        if (matchLabel != null) return matchLabel.groupValues[1]
+        // Look for explicit CN label patterns:
+        // - "C.N. 123456" or "C.N. 123456.7"
+        // - "CN: 123456" or "CN 123456"
+        // - "C.N: 123456.7"
+        val cnLabelRegex = Regex(
+            """(?:C\.?\s*N\.?|C\.N)\s*[:\.]?\s*(\d{6,7})(?:\.\d)?""", 
+            RegexOption.IGNORE_CASE
+        )
         
-        // 2. Look for GTIN-14 (0847...) or EAN-13 (84...) patterns
-        val longNumberRegex = Regex("""\b(\d{13,14})\b""")
-        val longMatches = longNumberRegex.findAll(text)
-        
-        for (match in longMatches) {
-            val number = match.groupValues[1]
-            
-            // GTIN-14 Spanish format: 0847XXXXXXXXXC
-            if (number.length == 14 && number.startsWith("0847")) {
-                val cnRaw = number.substring(4, 13)
-                return cnRaw.trimStart('0')
-            }
-            
-            // EAN-13 Spanish format: 84XXXXXXXC
-            if (number.length == 13 && number.startsWith("84")) {
-                val cnRaw = number.substring(2, 9)
-                return cnRaw.trimStart('0')
-            }
+        val match = cnLabelRegex.find(text)
+        if (match != null) {
+            val cn = match.groupValues[1]
+            Log.d(TAG, "Found CN from label: $cn")
+            return cn
         }
         
-        // 3. Fallback: look for 6-7 digits isolated
-        val codeRegex = Regex("""\b(\d{6,7})\b""")
-        val matches = codeRegex.findAll(text)
-            .map { it.groupValues[1] }
-            .toList()
-        
-        // Prefer 7-digit codes
-        return matches.firstOrNull { it.length == 7 } ?: matches.firstOrNull()
+        Log.d(TAG, "No CN label found in text")
+        return null
     }
 }

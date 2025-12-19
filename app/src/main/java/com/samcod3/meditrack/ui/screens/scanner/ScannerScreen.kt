@@ -16,6 +16,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -190,13 +191,12 @@ fun ScannerScreen(
                                         if (resultCN != null) {
                                             onMedicationScanned(resultCN)
                                         } else {
-                                            // Check if we found "SN" or "Serial" but no CN
-                                            if (recognizedText?.contains("SN", ignoreCase = true) == true || 
-                                                recognizedText?.contains("Serial", ignoreCase = true) == true) {
-                                                Toast.makeText(context, "Has escaneado el Nº de Serie. Busca el código CN o PC", Toast.LENGTH_LONG).show()
-                                            } else {
-                                                Toast.makeText(context, "No se encontró CN válido. Prueba la búsqueda manual", Toast.LENGTH_SHORT).show()
-                                            }
+                                            // No CN found - give helpful feedback
+                                            Toast.makeText(
+                                                context, 
+                                                "No se encontró 'C.N.'. Centra el código y vuelve a intentar", 
+                                                Toast.LENGTH_LONG
+                                            ).show()
                                         }
                                     }
                                 }
@@ -467,33 +467,80 @@ private fun ScanOverlay(scanMode: ScanMode) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        // Semi-transparent background
-        // ... (can add overlay visuals here)
-        
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // Scan area indicator
             Box(
                 modifier = Modifier
-                    .size(if (scanMode == ScanMode.BARCODE) 280.dp else 300.dp, if (scanMode == ScanMode.BARCODE) 150.dp else 200.dp)
+                    .size(if (scanMode == ScanMode.BARCODE) 280.dp else 300.dp, if (scanMode == ScanMode.BARCODE) 150.dp else 120.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
-                    // Could add borders here
+                    .border(2.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
             )
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            Text(
-                text = if (scanMode == ScanMode.BARCODE) 
-                    stringResource(R.string.scanner_instruction) 
-                else 
-                    "Apunta al Código Nacional (CN) y captura",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp)).padding(8.dp)
-            )
+            // Instructions based on mode
+            if (scanMode == ScanMode.BARCODE) {
+                Text(
+                    text = stringResource(R.string.scanner_instruction),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            } else {
+                // OCR Mode - Show example of CN format
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Busca en la caja:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.8f),
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Visual example of CN format
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(Color.White, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "C.N. ",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = "123456.7",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = "Centra el código y pulsa capturar",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
     }
 }
