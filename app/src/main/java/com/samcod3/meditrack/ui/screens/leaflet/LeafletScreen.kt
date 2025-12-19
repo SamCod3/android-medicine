@@ -189,119 +189,139 @@ private fun LeafletContent(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     
-    Column(modifier = modifier) {
-        // Spacer between header and content
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // My dosages section (if saved)
-        // Show if saved, even if dosages are empty (to allow adding)
-        if (savedMedicationId != null) {
-            MyDosageSection(
-                dosages = myDosages,
-                onAddReminder = onManageReminders,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 16.dp)
-            )
-        }
-        
-        // Medication info card
-        medication?.let {
-            MedicationInfoCard(
-                medication = it,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            )
-        }
-        
-        // Spacer between medication card and index
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        if (sections.isNotEmpty()) {
-            // Track current visible section
-            val firstVisibleItemIndex = listState.firstVisibleItemIndex
-            val currentSectionIndex = firstVisibleItemIndex.coerceIn(0, sections.lastIndex)
-            
-            SectionDropdown(
-                sections = sections,
-                currentSectionIndex = currentSectionIndex,
-                onSectionSelected = { index ->
-                    coroutineScope.launch {
-                        listState.animateScrollToItem(index)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // All sections in a scrollable list
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                itemsIndexed(sections) { index, section ->
-                    SectionCard(
-                        sectionNumber = index + 1,
-                        section = section,
+    // Calculate header items count for index adjustment
+    // Items before sections: Spacer(implicit), MyDosageSection?, MedicationInfoCard?, SectionDropdown
+    val headerItemsCount = run {
+        var count = 0
+        if (savedMedicationId != null) count++ // MyDosageSection
+        if (medication != null) count++ // MedicationInfoCard
+        if (sections.isNotEmpty()) count++ // SectionDropdown
+        count
+    }
+    
+    // Track current visible section (accounting for header items)
+    val firstVisibleItemIndex = listState.firstVisibleItemIndex
+    val currentSectionIndex = (firstVisibleItemIndex - headerItemsCount).coerceIn(0, sections.lastIndex.coerceAtLeast(0))
+    
+    if (sections.isNotEmpty()) {
+        // All content in a single scrollable LazyColumn
+        LazyColumn(
+            state = listState,
+            modifier = modifier,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // My dosages section (if saved)
+            if (savedMedicationId != null) {
+                item(key = "my_dosage") {
+                    MyDosageSection(
+                        dosages = myDosages,
+                        onAddReminder = onManageReminders,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                
-                // Bottom spacing for FAB
-                item {
-                    Spacer(modifier = Modifier.height(80.dp))
+            }
+            
+            // Medication info card
+            if (medication != null) {
+                item(key = "medication_info") {
+                    MedicationInfoCard(
+                        medication = medication,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
-        } else {
-            // Fallback for when segmented content is not available
-            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.secondary
+            
+            // Section index dropdown
+            item(key = "section_dropdown") {
+                SectionDropdown(
+                    sections = sections,
+                    currentSectionIndex = currentSectionIndex,
+                    onSectionSelected = { index ->
+                        coroutineScope.launch {
+                            // Scroll to section (add header items offset)
+                            listState.animateScrollToItem(index + headerItemsCount)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            
+            // All leaflet sections
+            itemsIndexed(
+                items = sections,
+                key = { index, section -> "section_$index" }
+            ) { index, section ->
+                SectionCard(
+                    sectionNumber = index + 1,
+                    section = section,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            
+            // Bottom spacing for FAB
+            item(key = "bottom_spacer") {
+                Spacer(modifier = Modifier.height(80.dp))
+            }
+        }
+    } else {
+        // Fallback for when segmented content is not available
+        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+        Column(
+            modifier = modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Show header cards even without sections
+            if (savedMedicationId != null) {
+                MyDosageSection(
+                    dosages = myDosages,
+                    onAddReminder = onManageReminders,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "No se pudo cargar el formato de lectura rápida.",
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center
+            }
+            
+            medication?.let {
+                MedicationInfoCard(
+                    medication = it,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "El prospecto no está disponible por secciones.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-                
-                if (!medication?.leafletUrl.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = { 
-                            try {
-                                uriHandler.openUri(medication!!.leafletUrl!!) 
-                            } catch (e: Exception) {
-                                // Ignore
-                            }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+            
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.secondary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "No se pudo cargar el formato de lectura rápida.",
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "El prospecto no está disponible por secciones.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            
+            if (!medication?.leafletUrl.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = { 
+                        try {
+                            uriHandler.openUri(medication!!.leafletUrl!!) 
+                        } catch (e: Exception) {
+                            // Ignore
                         }
-                    ) {
-                        Text("Ver Prospecto Oficial (Web)")
                     }
+                ) {
+                    Text("Ver Prospecto Oficial (Web)")
                 }
             }
         }
