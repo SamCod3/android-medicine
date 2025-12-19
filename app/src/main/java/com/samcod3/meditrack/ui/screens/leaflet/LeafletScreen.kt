@@ -74,6 +74,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -404,6 +408,83 @@ private fun cleanHtmlContent(html: String): String {
         .replace(Regex("^\\s+"), "") // Trim leading whitespace
         .replace(Regex("\\s+$"), "") // Trim trailing whitespace
 }
+
+/**
+ * Parses HTML content to AnnotatedString preserving formatting:
+ * - Bold (<b>, <strong>) 
+ * - Italic (<i>, <em>)
+ * - Lists (<ul>, <ol>, <li>) with bullet points
+ * - Removes multiple blank lines
+ */
+@Composable
+private fun parseHtmlToAnnotatedString(html: String): AnnotatedString {
+    return buildAnnotatedString {
+        // Pre-process HTML:
+        // 1. Convert <li> tags to bullet points
+        // 2. Add newlines for block elements
+        var processedHtml = html
+            // Handle list items - add bullet point before each item
+            .replace(Regex("<li[^>]*>", RegexOption.IGNORE_CASE), "• ")
+            .replace(Regex("</li>", RegexOption.IGNORE_CASE), "\n")
+            // Handle list containers
+            .replace(Regex("<ul[^>]*>", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("</ul>", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("<ol[^>]*>", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("</ol>", RegexOption.IGNORE_CASE), "")
+            // Handle paragraphs and breaks
+            .replace(Regex("<p[^>]*>", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("</p>", RegexOption.IGNORE_CASE), "\n\n")
+            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+        
+        // Parse using Android's Html parser to get Spanned (preserves bold/italic spans)
+        val spanned = Html.fromHtml(processedHtml, Html.FROM_HTML_MODE_COMPACT)
+        
+        // Convert Spanned to AnnotatedString
+        append(spanned.toString())
+        
+        // Apply spans from the Spanned object
+        spanned.getSpans(0, spanned.length, Any::class.java).forEach { span ->
+            val start = spanned.getSpanStart(span)
+            val end = spanned.getSpanEnd(span)
+            
+            when (span) {
+                is android.text.style.StyleSpan -> {
+                    when (span.style) {
+                        android.graphics.Typeface.BOLD -> {
+                            addStyle(SpanStyle(fontWeight = FontWeight.Bold), start, end)
+                        }
+                        android.graphics.Typeface.ITALIC -> {
+                            addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
+                        }
+                        android.graphics.Typeface.BOLD_ITALIC -> {
+                            addStyle(SpanStyle(fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic), start, end)
+                        }
+                    }
+                }
+            }
+        }
+    }.let { annotatedString ->
+        // Clean up multiple blank lines
+        val cleanedText = annotatedString.text
+            .replace(Regex("(\\n\\s*){3,}"), "\n\n")
+            .replace(Regex("^\\s+"), "")
+            .replace(Regex("\\s+$"), "")
+        
+        // Rebuild with cleaned text but preserve styles (approximate - styles may shift slightly)
+        buildAnnotatedString {
+            append(cleanedText)
+            // Re-apply styles to cleaned positions (best effort)
+            annotatedString.spanStyles.forEach { span ->
+                val adjustedStart = minOf(span.start, cleanedText.length)
+                val adjustedEnd = minOf(span.end, cleanedText.length)
+                if (adjustedStart < adjustedEnd) {
+                    addStyle(span.item, adjustedStart, adjustedEnd)
+                }
+            }
+        }
+    }
+}
+
 
 /**
  * Generates a PDF with the leaflet content and shares it.
@@ -955,11 +1036,11 @@ private fun SectionCard(
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Parse HTML content and clean multiple blank lines
-            val plainText = cleanHtmlContent(section.content)
+            // Parse HTML content preserving bold, italic and lists
+            val styledText = parseHtmlToAnnotatedString(section.content)
             
             Text(
-                text = plainText,
+                text = styledText,
                 style = MaterialTheme.typography.bodyMedium,
                 lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.4f
             )
