@@ -152,6 +152,12 @@ fun ScannerScreen(
         }
     }
     
+    // Reset zoom when scan mode changes (camera will rebind)
+    LaunchedEffect(scanMode) {
+        zoomRatio = 1f
+        camera?.cameraControl?.setZoomRatio(1f)
+    }
+    
     LaunchedEffect(uiState.scannedCode) {
         uiState.scannedCode?.let { code ->
             onMedicationScanned(code)
