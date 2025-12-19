@@ -49,6 +49,7 @@ fun MainScreen(
     onMedicationScanned: (String) -> Unit,
     onMedicationClicked: (String) -> Unit,
     onReminderClick: (medicationId: String, medicationName: String) -> Unit,
+    onTreatmentClick: () -> Unit,
     onChangeProfile: () -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 = Agenda (first tab now)
@@ -81,7 +82,8 @@ fun MainScreen(
                 0 -> AllRemindersScreen(
                     profileName = profileName,
                     onChangeProfile = onChangeProfile,
-                    onReminderClick = onReminderClick
+                    onReminderClick = onReminderClick,
+                    onTreatmentClick = onTreatmentClick
                 )
                 1 -> HomeScreen(
                     profileId = profileId,

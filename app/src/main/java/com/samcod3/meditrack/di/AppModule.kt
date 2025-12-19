@@ -7,6 +7,7 @@ import com.samcod3.meditrack.ui.screens.profiles.ProfileViewModel
 import com.samcod3.meditrack.ui.screens.reminders.ReminderViewModel
 import com.samcod3.meditrack.ui.screens.scanner.ScannerViewModel
 import com.samcod3.meditrack.ui.screens.search.SearchViewModel
+import com.samcod3.meditrack.ui.screens.treatment.MyTreatmentViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
@@ -43,5 +44,6 @@ val appModule = module {
     }
     // AllRemindersViewModel for global agenda view
     viewModel { AllRemindersViewModel(get()) }
+    // MyTreatmentViewModel for treatment summary
+    viewModel { MyTreatmentViewModel(get()) }
 }
-

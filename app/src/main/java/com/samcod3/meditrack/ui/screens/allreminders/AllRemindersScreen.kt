@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
@@ -49,6 +50,7 @@ fun AllRemindersScreen(
     profileName: String,
     onChangeProfile: () -> Unit,
     onReminderClick: (medicationId: String, medicationName: String) -> Unit,
+    onTreatmentClick: () -> Unit,
     viewModel: AllRemindersViewModel = koinViewModel()
 ) {
     val todayReminders by viewModel.todayReminders.collectAsState()
@@ -69,6 +71,9 @@ fun AllRemindersScreen(
                 }
             },
             actions = {
+                IconButton(onClick = onTreatmentClick) {
+                    Icon(Icons.Default.List, contentDescription = "Mi Tratamiento")
+                }
                 IconButton(onClick = onChangeProfile) {
                     Icon(Icons.Default.Person, contentDescription = "Cambiar perfil")
                 }

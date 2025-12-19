@@ -13,6 +13,7 @@ import com.samcod3.meditrack.ui.screens.main.MainScreen
 import com.samcod3.meditrack.ui.screens.profiles.ProfileViewModel
 import com.samcod3.meditrack.ui.screens.profiles.ProfilesScreen
 import com.samcod3.meditrack.ui.screens.reminders.ReminderScreen
+import com.samcod3.meditrack.ui.screens.treatment.MyTreatmentScreen
 import org.koin.androidx.compose.koinViewModel
 
 sealed class Screen(val route: String) {
@@ -28,6 +29,7 @@ sealed class Screen(val route: String) {
         fun createRoute(medicationId: String, medicationName: String) = 
             "reminders/$medicationId/${java.net.URLEncoder.encode(medicationName, "UTF-8")}"
     }
+    data object Treatment : Screen("treatment")
 }
 
 @Composable
@@ -74,6 +76,9 @@ fun MediTrackNavHost() {
                 },
                 onReminderClick = { medicationId, medicationName ->
                     navController.navigate(Screen.Reminders.createRoute(medicationId, medicationName))
+                },
+                onTreatmentClick = {
+                    navController.navigate(Screen.Treatment.route)
                 },
                 onChangeProfile = {
                     navController.navigate(Screen.Profiles.route) {
@@ -123,6 +128,12 @@ fun MediTrackNavHost() {
             ReminderScreen(
                 medicationId = medicationId,
                 medicationName = medicationName,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        
+        composable(Screen.Treatment.route) {
+            MyTreatmentScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
