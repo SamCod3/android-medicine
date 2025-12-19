@@ -144,13 +144,11 @@ fun MediTrackNavHost() {
                 navArgument("profileName") { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            val rawName = backStackEntry.arguments?.getString("profileName") ?: ""
             val profileName = try {
-                java.net.URLDecoder.decode(
-                    backStackEntry.arguments?.getString("profileName") ?: "",
-                    "UTF-8"
-                )
+                java.net.URLDecoder.decode(rawName, "UTF-8").ifEmpty { "Usuario" }
             } catch (e: Exception) {
-                backStackEntry.arguments?.getString("profileName") ?: "Usuario"
+                rawName.ifEmpty { "Usuario" }
             }
             
             MyTreatmentScreen(

@@ -389,7 +389,8 @@ private fun shareTreatmentAsPdf(
         val lineHeight = 18f
         
         // Header: Patient Name
-        canvas.drawText("Tratamiento de $patientName", leftMargin, yPosition, titlePaint)
+        val displayName = patientName.trim().ifEmpty { "Paciente" }
+        canvas.drawText("Tratamiento de $displayName", leftMargin, yPosition, titlePaint)
         yPosition += 30f
         
         // Date
