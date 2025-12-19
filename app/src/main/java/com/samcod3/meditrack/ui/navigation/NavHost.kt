@@ -104,6 +104,9 @@ fun MediTrackNavHost() {
                 onNavigateBack = { navController.popBackStack() },
                 onMedicationSaved = {
                     navController.popBackStack()
+                },
+                onAddReminderClick = { medicationId, medicationName ->
+                    navController.navigate(Screen.Reminders.createRoute(medicationId, medicationName))
                 }
             )
         }

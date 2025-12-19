@@ -22,7 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -75,6 +77,7 @@ fun LeafletScreen(
     profileId: String,
     onNavigateBack: () -> Unit,
     onMedicationSaved: () -> Unit,
+    onAddReminderClick: (String, String) -> Unit,
     viewModel: LeafletViewModel = koinViewModel { parametersOf(nationalCode, profileId) }
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -90,18 +93,27 @@ fun LeafletScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = uiState.medication?.name ?: stringResource(R.string.leaflet_title),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text("Prospecto")
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Volver"
                         )
+                    }
+                },
+                actions = {
+                    // Show dosage/calendar icon if medication is saved
+                    if (uiState.savedMedicationId != null) {
+                        IconButton(onClick = { 
+                            onAddReminderClick(
+                                uiState.savedMedicationId!!,
+                                uiState.medication?.name ?: "Medicamento"
+                            )
+                        }) {
+                            Icon(Icons.Default.CalendarToday, contentDescription = "Ver mi pauta")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -147,6 +159,15 @@ fun LeafletScreen(
                     medication = uiState.medication,
                     sections = uiState.sections,
                     myDosages = uiState.myDosages,
+                    savedMedicationId = uiState.savedMedicationId,
+                    onManageReminders = {
+                        if (uiState.savedMedicationId != null) {
+                            onAddReminderClick(
+                                uiState.savedMedicationId!!,
+                                uiState.medication?.name ?: "Medicamento"
+                            )
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
@@ -161,6 +182,8 @@ private fun LeafletContent(
     medication: Medication?,
     sections: List<LeafletSection>,
     myDosages: List<Reminder>,
+    savedMedicationId: String?,
+    onManageReminders: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -168,15 +191,18 @@ private fun LeafletContent(
     
     Column(modifier = modifier) {
         // Spacer between header and content
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
-        // My dosages section (if saved and has reminders)
-        if (myDosages.isNotEmpty()) {
+        // My dosages section (if saved)
+        // Show if saved, even if dosages are empty (to allow adding)
+        if (savedMedicationId != null) {
             MyDosageSection(
                 dosages = myDosages,
+                onAddReminder = onManageReminders,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp)
             )
         }
         
@@ -674,10 +700,12 @@ private fun ErrorState(
 @Composable
 private fun MyDosageSection(
     dosages: List<Reminder>,
+    onAddReminder: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier,
+        onClick = onAddReminder,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer
         ),
@@ -690,48 +718,74 @@ private fun MyDosageSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.Warning,
+                    imageVector = Icons.Default.CalendarToday,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Mi Dosis",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Mi Pauta",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Editar",
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
                 )
             }
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            dosages.forEach { reminder ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "•",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.padding(end = 8.dp)
+            if (dosages.isEmpty()) {
+                Text(
+                    text = "No tienes recordatorios activos para este medicamento.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onAddReminder,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary,
+                        contentColor = MaterialTheme.colorScheme.onTertiary
                     )
+                ) {
+                    Text("Añadir Recordatorio")
+                }
+            } else {
+                dosages.forEach { reminder ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text(
+                            text = "${reminder.dosageFormatted} a las ${reminder.timeFormatted}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
                     Text(
-                        text = "${reminder.dosageFormatted} a las ${reminder.timeFormatted}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                        text = reminder.scheduleFormatted,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(start = 20.dp)
                     )
                 }
-                Text(
-                    text = reminder.scheduleFormatted,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(start = 20.dp)
-                )
             }
         }
     }
