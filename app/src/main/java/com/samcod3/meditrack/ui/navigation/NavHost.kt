@@ -29,9 +29,9 @@ sealed class Screen(val route: String) {
         fun createRoute(medicationId: String, medicationName: String) = 
             "reminders/$medicationId/${java.net.URLEncoder.encode(medicationName, "UTF-8")}"
     }
-    data object Treatment : Screen("treatment/{profileName}") {
-        fun createRoute(profileName: String) = 
-            "treatment/${java.net.URLEncoder.encode(profileName, "UTF-8")}"
+    data object Treatment : Screen("treatment/{profileId}/{profileName}") {
+        fun createRoute(profileId: String, profileName: String) = 
+            "treatment/$profileId/${java.net.URLEncoder.encode(profileName, "UTF-8")}"
     }
 }
 
@@ -80,7 +80,7 @@ fun MediTrackNavHost() {
                     navController.navigate(Screen.Reminders.createRoute(medicationId, medicationName))
                 },
                 onTreatmentClick = {
-                    navController.navigate(Screen.Treatment.createRoute(profileName))
+                    navController.navigate(Screen.Treatment.createRoute(profileId, profileName))
                 },
                 onChangeProfile = {
                     navController.navigate(Screen.Profiles.route) {
@@ -140,9 +140,11 @@ fun MediTrackNavHost() {
         composable(
             route = Screen.Treatment.route,
             arguments = listOf(
+                navArgument("profileId") { type = NavType.StringType },
                 navArgument("profileName") { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            val profileId = backStackEntry.arguments?.getString("profileId") ?: ""
             val rawName = backStackEntry.arguments?.getString("profileName") ?: ""
             val profileName = try {
                 java.net.URLDecoder.decode(rawName, "UTF-8").ifEmpty { "Usuario" }
@@ -152,7 +154,10 @@ fun MediTrackNavHost() {
             
             MyTreatmentScreen(
                 profileName = profileName,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onMedicationClick = { nationalCode ->
+                    navController.navigate(Screen.Leaflet.createRoute(nationalCode, profileId))
+                }
             )
         }
     }

@@ -128,4 +128,15 @@ class LeafletViewModel(
     fun retry() {
         loadMedicationAndLeaflet()
     }
+    
+    /**
+     * Refresh reminders/dosages. Call this when returning from ReminderScreen.
+     */
+    fun refreshReminders() {
+        viewModelScope.launch {
+            val savedMedicationId = _uiState.value.savedMedicationId ?: return@launch
+            val reminders = reminderRepository.getRemindersForMedication(savedMedicationId).first()
+            _uiState.value = _uiState.value.copy(myDosages = reminders)
+        }
+    }
 }

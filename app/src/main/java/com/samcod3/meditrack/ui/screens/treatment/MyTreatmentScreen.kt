@@ -70,6 +70,7 @@ import java.util.Locale
 fun MyTreatmentScreen(
     profileName: String,
     onBackClick: () -> Unit,
+    onMedicationClick: (nationalCode: String) -> Unit,
     viewModel: MyTreatmentViewModel = koinViewModel()
 ) {
     val treatment by viewModel.treatment.collectAsState()
@@ -117,11 +118,11 @@ fun MyTreatmentScreen(
         if (treatment.totalCount == 0) {
             EmptyTreatmentMessage(modifier = Modifier.padding(paddingValues))
         } else {
-            // Expansion states for each group
-            var dailyExpanded by remember { mutableStateOf(true) }
-            var weeklyExpanded by remember { mutableStateOf(true) }
-            var monthlyExpanded by remember { mutableStateOf(true) }
-            var intervalExpanded by remember { mutableStateOf(true) }
+            // Expansion states for each group (collapsed by default)
+            var dailyExpanded by remember { mutableStateOf(false) }
+            var weeklyExpanded by remember { mutableStateOf(false) }
+            var monthlyExpanded by remember { mutableStateOf(false) }
+            var intervalExpanded by remember { mutableStateOf(false) }
             
             LazyColumn(
                 modifier = Modifier
@@ -147,7 +148,10 @@ fun MyTreatmentScreen(
                         // Group by medication name (base name without dosage)
                         val groupedDaily = treatment.daily.sortedBy { extractBaseName(it.medicationName) }
                         items(groupedDaily, key = { "daily-${it.id}" }) { reminder ->
-                            TreatmentReminderCard(reminder = reminder)
+                            TreatmentReminderCard(
+                                reminder = reminder,
+                                onClick = { onMedicationClick(reminder.nationalCode) }
+                            )
                         }
                     }
                 }
@@ -180,7 +184,8 @@ fun MyTreatmentScreen(
                             items(sortedReminders, key = { "weekly-${it.id}" }) { reminder ->
                                 TreatmentReminderCard(
                                     reminder = reminder,
-                                    showSchedule = false
+                                    showSchedule = false,
+                                    onClick = { onMedicationClick(reminder.nationalCode) }
                                 )
                             }
                         }
@@ -203,7 +208,10 @@ fun MyTreatmentScreen(
                     if (monthlyExpanded) {
                         val groupedMonthly = treatment.monthly.sortedBy { extractBaseName(it.medicationName) }
                         items(groupedMonthly, key = { "monthly-${it.id}" }) { reminder ->
-                            TreatmentReminderCard(reminder = reminder)
+                            TreatmentReminderCard(
+                                reminder = reminder,
+                                onClick = { onMedicationClick(reminder.nationalCode) }
+                            )
                         }
                     }
                 }
@@ -224,7 +232,10 @@ fun MyTreatmentScreen(
                     if (intervalExpanded) {
                         val groupedInterval = treatment.interval.sortedBy { extractBaseName(it.medicationName) }
                         items(groupedInterval, key = { "interval-${it.id}" }) { reminder ->
-                            TreatmentReminderCard(reminder = reminder)
+                            TreatmentReminderCard(
+                                reminder = reminder,
+                                onClick = { onMedicationClick(reminder.nationalCode) }
+                            )
                         }
                     }
                 }
@@ -315,19 +326,19 @@ private fun CollapsibleScheduleHeader(
                 modifier = Modifier.weight(1f)
             )
             
-            // Count badge with better contrast
+            // Count badge with high contrast
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = color
+                    containerColor = MaterialTheme.colorScheme.inverseSurface
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
                     text = "$count",
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
             }
             
@@ -347,9 +358,11 @@ private fun CollapsibleScheduleHeader(
 @Composable
 private fun TreatmentReminderCard(
     reminder: Reminder,
-    showSchedule: Boolean = true
+    showSchedule: Boolean = true,
+    onClick: () -> Unit
 ) {
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(

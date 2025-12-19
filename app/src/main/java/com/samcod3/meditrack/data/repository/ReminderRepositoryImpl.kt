@@ -92,6 +92,7 @@ class ReminderRepositoryImpl(
             id = id,
             medicationId = medicationId,
             medicationName = medication?.name ?: "",
+            nationalCode = medication?.nationalCode ?: "",
             hour = hour,
             minute = minute,
             scheduleType = ScheduleType.entries.find { it.name == scheduleType } ?: ScheduleType.DAILY,
