@@ -153,6 +153,7 @@ fun MediTrackNavHost() {
             }
             
             MyTreatmentScreen(
+                profileId = profileId,
                 profileName = profileName,
                 onBackClick = { navController.popBackStack() },
                 onMedicationClick = { nationalCode ->

@@ -68,10 +68,11 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyTreatmentScreen(
+    profileId: String,
     profileName: String,
     onBackClick: () -> Unit,
     onMedicationClick: (nationalCode: String) -> Unit,
-    viewModel: MyTreatmentViewModel = koinViewModel()
+    viewModel: MyTreatmentViewModel = koinViewModel { org.koin.core.parameter.parametersOf(profileId) }
 ) {
     val treatment by viewModel.treatment.collectAsState()
     val context = LocalContext.current

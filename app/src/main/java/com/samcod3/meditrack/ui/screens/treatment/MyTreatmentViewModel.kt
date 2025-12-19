@@ -24,11 +24,12 @@ data class TreatmentGrouped(
 }
 
 class MyTreatmentViewModel(
+    private val profileId: String,
     private val reminderRepository: ReminderRepository
 ) : ViewModel() {
     
     val treatment: StateFlow<TreatmentGrouped> = reminderRepository
-        .getAllEnabledReminders()
+        .getEnabledRemindersForProfile(profileId)
         .map { reminders ->
             val daily = reminders
                 .filter { it.scheduleType == ScheduleType.DAILY }

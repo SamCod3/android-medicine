@@ -49,6 +49,11 @@ val appModule = module {
             reminderRepository = get()
         )
     }
-    // MyTreatmentViewModel for treatment summary
-    viewModel { MyTreatmentViewModel(get()) }
+    // MyTreatmentViewModel for treatment summary (filtered by profile)
+    viewModel { params ->
+        MyTreatmentViewModel(
+            profileId = params[0],
+            reminderRepository = get()
+        )
+    }
 }
