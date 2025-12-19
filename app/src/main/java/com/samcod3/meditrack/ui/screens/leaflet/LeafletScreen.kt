@@ -110,7 +110,8 @@ fun LeafletScreen(
             )
         },
         floatingActionButton = {
-            if (!uiState.isLoading && uiState.medication != null) {
+            // Only show FAB if medication is loaded AND not already saved
+            if (!uiState.isLoading && uiState.medication != null && uiState.savedMedicationId == null) {
                 ExtendedFloatingActionButton(
                     text = { Text("Guardar en Botiquín") },
                     icon = { Icon(Icons.Default.BookmarkAdd, contentDescription = null) },
@@ -185,12 +186,19 @@ private fun LeafletContent(
             )
         }
         
-                if (sections.isNotEmpty()) {
+        // Spacer between medication card and index
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        if (sections.isNotEmpty()) {
+            // Track current visible section
+            val firstVisibleItemIndex = listState.firstVisibleItemIndex
+            val currentSectionIndex = firstVisibleItemIndex.coerceIn(0, sections.lastIndex)
+            
             SectionDropdown(
                 sections = sections,
+                currentSectionIndex = currentSectionIndex,
                 onSectionSelected = { index ->
                     coroutineScope.launch {
-                        // +1 because medication card is at index 0 if present
                         listState.animateScrollToItem(index)
                     }
                 },
@@ -273,39 +281,48 @@ private fun LeafletContent(
 @Composable
 private fun SectionDropdown(
     sections: List<LeafletSection>,
+    currentSectionIndex: Int,
     onSectionSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val currentSection = sections.getOrNull(currentSectionIndex)
+    
+    // Clean title: remove leading numbers like "1.1" or "1."
+    fun cleanTitle(title: String): String {
+        return title.replace(Regex("^\\d+\\.?\\d*\\.?\\s*"), "").trim()
+    }
     
     Box(modifier = modifier) {
         OutlinedCard(
             onClick = { expanded = true },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(8.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Índice del Prospecto",
-                        style = MaterialTheme.typography.labelMedium,
+                        text = "Leyendo sección ${currentSectionIndex + 1} de ${sections.size}",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Selecciona una sección para ir directamente",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = cleanTitle(currentSection?.title ?: "Índice del Prospecto"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Expandir",
+                    contentDescription = "Expandir índice",
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -314,27 +331,52 @@ private fun SectionDropdown(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxWidth(0.9f)
+            modifier = Modifier.fillMaxWidth(0.92f)
         ) {
             sections.forEachIndexed { index, section ->
+                val isCurrentSection = index == currentSectionIndex
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = "${index + 1}. ${section.title}",
+                            text = cleanTitle(section.title),
                             style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isCurrentSection) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isCurrentSection) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.onSurface,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    leadingIcon = {
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isCurrentSection) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isCurrentSection) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
                     onClick = {
                         expanded = false
                         onSectionSelected(index)
+                    },
+                    colors = if (isCurrentSection) {
+                        androidx.compose.material3.MenuDefaults.itemColors(
+                            textColor = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        androidx.compose.material3.MenuDefaults.itemColors()
                     }
                 )
             }
         }
     }
 }
+
 
 @Composable
 private fun MedicationInfoCard(
