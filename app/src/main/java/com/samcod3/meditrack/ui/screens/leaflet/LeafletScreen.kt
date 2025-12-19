@@ -1,5 +1,10 @@
 package com.samcod3.meditrack.ui.screens.leaflet
 
+import android.content.Context
+import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
 import android.text.Html
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -35,6 +40,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -78,8 +84,12 @@ import com.samcod3.meditrack.domain.model.Medication
 import com.samcod3.meditrack.domain.model.Reminder
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
+import java.io.File
+import java.io.FileOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -274,6 +284,8 @@ private fun LeafletContent(
                 modifier = Modifier.fillMaxSize()
             ) {
                 // Custom header with close button and medication name
+                val context = LocalContext.current
+                
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     tonalElevation = 2.dp
@@ -302,6 +314,21 @@ private fun LeafletContent(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
+                        
+                        // Share PDF button
+                        IconButton(
+                            onClick = {
+                                medication?.let {
+                                    shareLeafletAsPdf(context, it, sections)
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Compartir como PDF",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                     }
                 }
                 
@@ -358,6 +385,197 @@ private fun LeafletContent(
 // Helper to clean section titles
 private fun cleanSectionTitle(title: String): String {
     return title.replace(Regex("^\\d+\\.?\\d*\\.?\\s*"), "").trim()
+}
+
+/**
+ * Parses HTML content and cleans up formatting:
+ * - Converts HTML to plain text
+ * - Removes multiple consecutive blank lines
+ * - Trims leading/trailing whitespace
+ */
+private fun cleanHtmlContent(html: String): String {
+    // Parse HTML to plain text
+    val rawText = Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT).toString()
+    
+    // Replace multiple newlines (2 or more) with just one newline
+    // Also handles cases with whitespace between newlines
+    return rawText
+        .replace(Regex("(\\n\\s*){2,}"), "\n\n") // Max 2 newlines (one empty line)
+        .replace(Regex("^\\s+"), "") // Trim leading whitespace
+        .replace(Regex("\\s+$"), "") // Trim trailing whitespace
+}
+
+/**
+ * Generates a PDF with the leaflet content and shares it.
+ */
+private fun shareLeafletAsPdf(
+    context: Context,
+    medication: Medication,
+    sections: List<LeafletSection>
+) {
+    try {
+        val pdfDocument = PdfDocument()
+        val pageWidth = 595 // A4 width in points
+        val pageHeight = 842 // A4 height in points
+        
+        // Paints
+        val titlePaint = Paint().apply {
+            textSize = 18f
+            isFakeBoldText = true
+            color = android.graphics.Color.BLACK
+        }
+        val headerPaint = Paint().apply {
+            textSize = 14f
+            isFakeBoldText = true
+            color = android.graphics.Color.rgb(50, 50, 150)
+        }
+        val bodyPaint = Paint().apply {
+            textSize = 11f
+            color = android.graphics.Color.BLACK
+        }
+        val lightPaint = Paint().apply {
+            textSize = 10f
+            color = android.graphics.Color.GRAY
+        }
+        
+        val leftMargin = 40f
+        val rightMargin = 40f
+        val maxWidth = pageWidth - leftMargin - rightMargin
+        val lineHeight = 16f
+        val sectionSpacing = 24f
+        
+        var currentPage = 1
+        var pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create()
+        var page = pdfDocument.startPage(pageInfo)
+        var canvas: Canvas = page.canvas
+        var yPosition = 60f
+        
+        // Title
+        canvas.drawText(medication.name, leftMargin, yPosition, titlePaint)
+        yPosition += 24f
+        
+        // Subtitle with active ingredients
+        if (medication.activeIngredients.isNotEmpty()) {
+            val ingredients = medication.activeIngredients.take(2).joinToString(", ") { 
+                "${it.name} ${it.quantity}${it.unit}" 
+            }
+            canvas.drawText(ingredients, leftMargin, yPosition, lightPaint)
+            yPosition += 20f
+        }
+        
+        yPosition += 16f
+        
+        // Sections
+        for ((index, section) in sections.withIndex()) {
+            val sectionTitle = "${index + 1}. ${cleanSectionTitle(section.title)}"
+            val sectionContent = cleanHtmlContent(section.content)
+            
+            // Check if we need a new page (rough estimate)
+            val estimatedHeight = sectionSpacing + 20 + (sectionContent.length / 80 * lineHeight)
+            if (yPosition + estimatedHeight > pageHeight - 60) {
+                pdfDocument.finishPage(page)
+                currentPage++
+                pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create()
+                page = pdfDocument.startPage(pageInfo)
+                canvas = page.canvas
+                yPosition = 60f
+            }
+            
+            // Section header
+            canvas.drawText(sectionTitle, leftMargin, yPosition, headerPaint)
+            yPosition += 20f
+            
+            // Section content - wrap text
+            val words = sectionContent.split(Regex("\\s+"))
+            var currentLine = StringBuilder()
+            
+            for (word in words) {
+                if (word == "\n" || word.contains("\n")) {
+                    // Handle newlines
+                    val parts = word.split("\n")
+                    for ((i, part) in parts.withIndex()) {
+                        if (part.isNotEmpty()) {
+                            val testLine = if (currentLine.isEmpty()) part else "$currentLine $part"
+                            if (bodyPaint.measureText(testLine) <= maxWidth) {
+                                if (currentLine.isNotEmpty()) currentLine.append(" ")
+                                currentLine.append(part)
+                            } else {
+                                if (currentLine.isNotEmpty()) {
+                                    canvas.drawText(currentLine.toString(), leftMargin, yPosition, bodyPaint)
+                                    yPosition += lineHeight
+                                }
+                                currentLine = StringBuilder(part)
+                            }
+                        }
+                        if (i < parts.lastIndex) {
+                            if (currentLine.isNotEmpty()) {
+                                canvas.drawText(currentLine.toString(), leftMargin, yPosition, bodyPaint)
+                                yPosition += lineHeight
+                                currentLine = StringBuilder()
+                            }
+                        }
+                    }
+                } else {
+                    val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+                    if (bodyPaint.measureText(testLine) <= maxWidth) {
+                        if (currentLine.isNotEmpty()) currentLine.append(" ")
+                        currentLine.append(word)
+                    } else {
+                        canvas.drawText(currentLine.toString(), leftMargin, yPosition, bodyPaint)
+                        yPosition += lineHeight
+                        currentLine = StringBuilder(word)
+                        
+                        // Check if we need a new page
+                        if (yPosition > pageHeight - 60) {
+                            pdfDocument.finishPage(page)
+                            currentPage++
+                            pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, currentPage).create()
+                            page = pdfDocument.startPage(pageInfo)
+                            canvas = page.canvas
+                            yPosition = 60f
+                        }
+                    }
+                }
+            }
+            
+            // Draw remaining line
+            if (currentLine.isNotEmpty()) {
+                canvas.drawText(currentLine.toString(), leftMargin, yPosition, bodyPaint)
+                yPosition += lineHeight
+            }
+            
+            yPosition += sectionSpacing
+        }
+        
+        pdfDocument.finishPage(page)
+        
+        // Save to cache
+        val fileName = "Prospecto_${medication.name.replace(Regex("[^a-zA-Z0-9]"), "_")}.pdf"
+        val file = File(context.cacheDir, fileName)
+        FileOutputStream(file).use { output ->
+            pdfDocument.writeTo(output)
+        }
+        pdfDocument.close()
+        
+        // Share
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            file
+        )
+        
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Prospecto: ${medication.name}")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        
+        context.startActivity(Intent.createChooser(shareIntent, "Compartir prospecto"))
+        
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }
 
 @Composable
@@ -737,11 +955,8 @@ private fun SectionCard(
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Parse HTML content and display as text
-            val plainText = Html.fromHtml(
-                section.content,
-                Html.FROM_HTML_MODE_COMPACT
-            ).toString()
+            // Parse HTML content and clean multiple blank lines
+            val plainText = cleanHtmlContent(section.content)
             
             Text(
                 text = plainText,
