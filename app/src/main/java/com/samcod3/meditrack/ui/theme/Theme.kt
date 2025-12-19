@@ -77,6 +77,8 @@ fun MediTrackTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = MediTrackTypography,
+        shapes = MediTrackShapes,
         content = content
     )
 }
+
