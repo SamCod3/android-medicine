@@ -3,12 +3,56 @@ package com.samcod3.meditrack.domain.util
 import android.util.Log
 
 /**
+ * Classification of barcode types for Spanish pharmaceutical products.
+ */
+enum class BarcodeType {
+    MEDICATION,      // 847000 - Medicamentos registrados AEMPS
+    HEALTH_PRODUCT,  // 848000 - Productos sanitarios
+    COMMERCIAL,      // 843xxx, 841xxx, etc. - Parafarmacia/comercial (no CN extraíble)
+    UNKNOWN          // Otros formatos
+}
+
+/**
  * Utility class for extracting National Codes (CN) from various barcode formats.
  * Supports Spanish pharmaceutical barcodes (EAN-13, GTIN-14, GS1 DataMatrix).
  */
 object BarcodeExtractor {
     
     private const val TAG = "BarcodeExtractor"
+    
+    /**
+     * Classifies a barcode to determine its type.
+     */
+    fun classifyBarcode(barcode: String): BarcodeType {
+        val cleanCode = barcode.replace("\u001D", "").replace("\\s".toRegex(), "")
+        
+        // GS1 DataMatrix - extract GTIN first
+        if (cleanCode.startsWith("01") && cleanCode.length >= 16) {
+            val gtin = cleanCode.substring(2, 16)
+            return classifyGtin(gtin)
+        }
+        
+        // Direct EAN-13
+        if (cleanCode.length == 13 && cleanCode.all { it.isDigit() }) {
+            return when {
+                cleanCode.startsWith("847000") -> BarcodeType.MEDICATION
+                cleanCode.startsWith("848000") -> BarcodeType.HEALTH_PRODUCT
+                cleanCode.startsWith("84") -> BarcodeType.COMMERCIAL // 843, 841, 842, etc.
+                else -> BarcodeType.UNKNOWN
+            }
+        }
+        
+        return BarcodeType.UNKNOWN
+    }
+    
+    private fun classifyGtin(gtin: String): BarcodeType {
+        return when {
+            gtin.startsWith("0847000") || gtin.startsWith("847000") -> BarcodeType.MEDICATION
+            gtin.startsWith("0848000") || gtin.startsWith("848000") -> BarcodeType.HEALTH_PRODUCT
+            gtin.startsWith("084") || gtin.startsWith("84") -> BarcodeType.COMMERCIAL
+            else -> BarcodeType.UNKNOWN
+        }
+    }
     
     /**
      * Extracts the National Code from a raw barcode string.

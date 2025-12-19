@@ -94,13 +94,14 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.samcod3.meditrack.R
 import com.samcod3.meditrack.domain.util.BarcodeExtractor
+import com.samcod3.meditrack.domain.util.BarcodeType
 import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 enum class ScanMode {
-    BARCODE, TEXT_OCR
+    BARCODE, CAJA
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -130,6 +131,9 @@ fun ScannerScreen(
     
     // PreviewView reference for focus calculations
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    
+    // Parafarmacia detection dialog
+    var showParafarmaciaDialog by remember { mutableStateOf(false) }
     
     // Update zoom state when camera changes
     LaunchedEffect(camera) {
@@ -176,7 +180,19 @@ fun ScannerScreen(
                     scanMode = scanMode,
                     onBarcodeDetected = { barcode ->
                         if (scanMode == ScanMode.BARCODE) {
-                            viewModel.onBarcodeScanned(barcode)
+                            // Classify barcode type before processing
+                            when (BarcodeExtractor.classifyBarcode(barcode)) {
+                                BarcodeType.MEDICATION, BarcodeType.HEALTH_PRODUCT -> {
+                                    viewModel.onBarcodeScanned(barcode)
+                                }
+                                BarcodeType.COMMERCIAL -> {
+                                    showParafarmaciaDialog = true
+                                }
+                                BarcodeType.UNKNOWN -> {
+                                    // Try anyway, might be a plain CN
+                                    viewModel.onBarcodeScanned(barcode)
+                                }
+                            }
                         }
                     },
                     onCameraReady = { cam, imgCap, pv ->
@@ -339,7 +355,7 @@ fun ScannerScreen(
                             }
                             
                             // Capture Button (Only for Text Mode)
-                            if (scanMode == ScanMode.TEXT_OCR) {
+                            if (scanMode == ScanMode.CAJA) {
                                 FloatingActionButton(
                                     onClick = {
                                         if (!isProcessingText && imageCapture != null) {
@@ -398,6 +414,45 @@ fun ScannerScreen(
             }
         }
     }
+    
+    // Parafarmacia detected dialog
+    if (showParafarmaciaDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showParafarmaciaDialog = false },
+            title = { 
+                Text(
+                    "Producto de parafarmacia",
+                    fontWeight = FontWeight.Bold
+                ) 
+            },
+            text = {
+                Text(
+                    "Este código parece de parafarmacia o cosmética, no es un medicamento registrado en CIMA.\n\nPuedes probar con el modo 'Caja' para leer el CN impreso en el envase, o buscar por nombre.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showParafarmaciaDialog = false
+                        scanMode = ScanMode.CAJA
+                    }
+                ) {
+                    Text("Modo Caja")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showParafarmaciaDialog = false
+                        onSearchRequested()
+                    }
+                ) {
+                    Text("Buscar por nombre")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -417,9 +472,9 @@ fun ModeToggle(currentMode: ScanMode, onModeChanged: (ScanMode) -> Unit) {
             Spacer(modifier = Modifier.width(8.dp))
             ModeButton(
                 icon = Icons.Default.DocumentScanner,
-                text = "Texto",
-                isSelected = currentMode == ScanMode.TEXT_OCR,
-                onClick = { onModeChanged(ScanMode.TEXT_OCR) }
+                text = "Caja",
+                isSelected = currentMode == ScanMode.CAJA,
+                onClick = { onModeChanged(ScanMode.CAJA) }
             )
         }
     }
