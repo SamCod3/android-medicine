@@ -3,18 +3,26 @@ package com.samcod3.meditrack.ui.screens.scanner
 import android.Manifest
 import android.content.Context
 import android.util.Log
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -24,6 +32,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,10 +40,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CameraFront
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
@@ -42,6 +53,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -50,17 +63,22 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -76,8 +94,10 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.samcod3.meditrack.R
 import com.samcod3.meditrack.domain.util.BarcodeExtractor
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 enum class ScanMode {
     BARCODE, TEXT_OCR
@@ -98,6 +118,39 @@ fun ScannerScreen(
     var scanMode by remember { mutableStateOf(ScanMode.BARCODE) }
     var isProcessingText by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    
+    // Zoom state
+    var zoomRatio by remember { mutableFloatStateOf(1f) }
+    var minZoom by remember { mutableFloatStateOf(1f) }
+    var maxZoom by remember { mutableFloatStateOf(1f) }
+    
+    // Focus indicator state
+    var focusPoint by remember { mutableStateOf<Offset?>(null) }
+    var showFocusIndicator by remember { mutableStateOf(false) }
+    
+    // PreviewView reference for focus calculations
+    var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    
+    // Update zoom state when camera changes
+    LaunchedEffect(camera) {
+        camera?.let { cam ->
+            val zoomState = cam.cameraInfo.zoomState
+            // Initial values
+            zoomState.value?.let { state ->
+                zoomRatio = state.zoomRatio
+                minZoom = state.minZoomRatio
+                maxZoom = state.maxZoomRatio
+            }
+        }
+    }
+    
+    // Hide focus indicator after delay
+    LaunchedEffect(showFocusIndicator) {
+        if (showFocusIndicator) {
+            delay(1500)
+            showFocusIndicator = false
+        }
+    }
     
     LaunchedEffect(uiState.scannedCode) {
         uiState.scannedCode?.let { code ->
@@ -120,11 +173,56 @@ fun ScannerScreen(
                             viewModel.onBarcodeScanned(barcode)
                         }
                     },
-                    onCameraReady = { cam, imgCap ->
+                    onCameraReady = { cam, imgCap, pv ->
                         camera = cam
                         imageCapture = imgCap
+                        previewView = pv
                     }
                 )
+                
+                // Tap-to-focus gesture layer
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures { offset ->
+                                // Trigger focus at tap point
+                                camera?.let { cam ->
+                                    previewView?.let { pv ->
+                                        val factory = SurfaceOrientedMeteringPointFactory(
+                                            pv.width.toFloat(),
+                                            pv.height.toFloat()
+                                        )
+                                        val point = factory.createPoint(offset.x, offset.y)
+                                        val action = FocusMeteringAction.Builder(point)
+                                            .setAutoCancelDuration(3, TimeUnit.SECONDS)
+                                            .build()
+                                        cam.cameraControl.startFocusAndMetering(action)
+                                        
+                                        // Show focus indicator
+                                        focusPoint = offset
+                                        showFocusIndicator = true
+                                    }
+                                }
+                            }
+                        }
+                )
+                
+                // Focus indicator
+                AnimatedVisibility(
+                    visible = showFocusIndicator && focusPoint != null,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    focusPoint?.let { point ->
+                        Box(
+                            modifier = Modifier
+                                .offset { IntOffset((point.x - 30.dp.toPx()).toInt(), (point.y - 30.dp.toPx()).toInt()) }
+                                .size(60.dp)
+                                .border(2.dp, Color.White, RoundedCornerShape(8.dp))
+                        )
+                    }
+                }
                 
                 // Scan overlay
                 ScanOverlay(scanMode)
@@ -136,15 +234,52 @@ fun ScannerScreen(
                         .padding(24.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Top Bar: Mode Toggle
-                    Row(
+                    // Top Bar: Mode Toggle + Zoom level
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         ModeToggle(
                             currentMode = scanMode,
                             onModeChanged = { scanMode = it }
                         )
+                        
+                        // Zoom slider (only show if camera supports zoom > 1x)
+                        if (maxZoom > 1.1f) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.ZoomIn,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Slider(
+                                    value = zoomRatio,
+                                    onValueChange = { newZoom ->
+                                        camera?.cameraControl?.setZoomRatio(newZoom)
+                                    },
+                                    valueRange = minZoom..maxZoom,
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.White,
+                                        activeTrackColor = Color.White,
+                                        inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                                    )
+                                )
+                                Text(
+                                    text = "%.1fx".format(zoomRatio),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
                     }
                     
                     // Bottom Bar: Flash & Capture + Manual Search
@@ -369,7 +504,7 @@ private fun processTextOcr(
 private fun CameraPreview(
     scanMode: ScanMode,
     onBarcodeDetected: (String) -> Unit,
-    onCameraReady: (Camera, ImageCapture) -> Unit
+    onCameraReady: (Camera, ImageCapture, PreviewView) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -437,21 +572,14 @@ private fun CameraPreview(
             
             try {
                 cameraProvider.unbindAll()
-                // Bind both analysis (for barcode) and capture (for text) always? 
-                // Or selectively? Binding both is fine.
-                // Note: Some low-end devices can't handle Preview + Analysis + Capture.
-                // But modern ones can. To be safe, we can unbind Analysis in Text Mode if we wanted, 
-                // but switching is smoother if bound. Let's bind all 3 use cases if possible.
-                // If bind fails, we might need fallback.
                 
                 val camera = if (scanMode == ScanMode.BARCODE) {
                     cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalysis, imageCapture)
                 } else {
-                    // In Text mode, we might drop analysis to ensure Capture has resources
                     cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageCapture)
                 }
                 
-                onCameraReady(camera, imageCapture)
+                onCameraReady(camera, imageCapture, previewView)
             } catch (e: Exception) {
                 Log.e("ScannerScreen", "Camera binding failed", e)
             }
