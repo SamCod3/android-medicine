@@ -47,7 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -118,11 +118,11 @@ fun MyTreatmentScreen(
         if (treatment.totalCount == 0) {
             EmptyTreatmentMessage(modifier = Modifier.padding(paddingValues))
         } else {
-            // Expansion states for each group (collapsed by default)
-            var dailyExpanded by remember { mutableStateOf(false) }
-            var weeklyExpanded by remember { mutableStateOf(false) }
-            var monthlyExpanded by remember { mutableStateOf(false) }
-            var intervalExpanded by remember { mutableStateOf(false) }
+            // Expansion states for each group (collapsed by default, saved across navigation)
+            var dailyExpanded by rememberSaveable { mutableStateOf(false) }
+            var weeklyExpanded by rememberSaveable { mutableStateOf(false) }
+            var monthlyExpanded by rememberSaveable { mutableStateOf(false) }
+            var intervalExpanded by rememberSaveable { mutableStateOf(false) }
             
             LazyColumn(
                 modifier = Modifier
@@ -145,9 +145,9 @@ fun MyTreatmentScreen(
                     }
                     
                     if (dailyExpanded) {
-                        // Group by medication name (base name without dosage)
-                        val groupedDaily = treatment.daily.sortedBy { extractBaseName(it.medicationName) }
-                        items(groupedDaily, key = { "daily-${it.id}" }) { reminder ->
+                        // Sort alphabetically by medication name
+                        val sortedDaily = treatment.daily.sortedBy { it.medicationName.lowercase() }
+                        items(sortedDaily, key = { "daily-${it.id}" }) { reminder ->
                             TreatmentReminderCard(
                                 reminder = reminder,
                                 onClick = { onMedicationClick(reminder.nationalCode) }
@@ -180,7 +180,7 @@ fun MyTreatmentScreen(
                                     modifier = Modifier.padding(start = 8.dp, top = 4.dp)
                                 )
                             }
-                            val sortedReminders = reminders.sortedBy { extractBaseName(it.medicationName) }
+                            val sortedReminders = reminders.sortedBy { it.medicationName.lowercase() }
                             items(sortedReminders, key = { "weekly-${it.id}" }) { reminder ->
                                 TreatmentReminderCard(
                                     reminder = reminder,
@@ -206,8 +206,8 @@ fun MyTreatmentScreen(
                     }
                     
                     if (monthlyExpanded) {
-                        val groupedMonthly = treatment.monthly.sortedBy { extractBaseName(it.medicationName) }
-                        items(groupedMonthly, key = { "monthly-${it.id}" }) { reminder ->
+                        val sortedMonthly = treatment.monthly.sortedBy { it.medicationName.lowercase() }
+                        items(sortedMonthly, key = { "monthly-${it.id}" }) { reminder ->
                             TreatmentReminderCard(
                                 reminder = reminder,
                                 onClick = { onMedicationClick(reminder.nationalCode) }
@@ -230,8 +230,8 @@ fun MyTreatmentScreen(
                     }
                     
                     if (intervalExpanded) {
-                        val groupedInterval = treatment.interval.sortedBy { extractBaseName(it.medicationName) }
-                        items(groupedInterval, key = { "interval-${it.id}" }) { reminder ->
+                        val sortedInterval = treatment.interval.sortedBy { it.medicationName.lowercase() }
+                        items(sortedInterval, key = { "interval-${it.id}" }) { reminder ->
                             TreatmentReminderCard(
                                 reminder = reminder,
                                 onClick = { onMedicationClick(reminder.nationalCode) }
@@ -244,18 +244,6 @@ fun MyTreatmentScreen(
     }
 }
 
-/**
- * Extracts the base medication name (without dosage numbers) for grouping.
- * E.g., "Ibuprofeno 600mg" -> "Ibuprofeno"
- */
-private fun extractBaseName(medicationName: String): String {
-    // Remove common dosage patterns like "600mg", "1000 mg", "20 mcg", etc.
-    return medicationName
-        .replace(Regex("\\s*\\d+\\s*(mg|mcg|ml|g|ui|iu)\\b", RegexOption.IGNORE_CASE), "")
-        .replace(Regex("\\s*\\d+[,.]\\d+\\s*(mg|mcg|ml|g)\\b", RegexOption.IGNORE_CASE), "")
-        .trim()
-        .uppercase()
-}
 
 @Composable
 private fun EmptyTreatmentMessage(modifier: Modifier = Modifier) {
@@ -492,7 +480,7 @@ private fun shareTreatmentAsPdf(
             canvas.drawText("📅 TODOS LOS DÍAS (${treatment.daily.size})", leftMargin, yPosition, headerPaint)
             yPosition += 20f
             
-            treatment.daily.sortedBy { extractBaseName(it.medicationName) }.forEach { reminder ->
+            treatment.daily.sortedBy { it.medicationName.lowercase() }.forEach { reminder ->
                 canvas.drawText("• ${reminder.medicationName}", leftMargin + 15, yPosition, bodyPaint)
                 yPosition += lineHeight
                 canvas.drawText("  ${reminder.dosageFormatted} - ${reminder.timeFormatted}", leftMargin + 15, yPosition, lightPaint)
@@ -511,7 +499,7 @@ private fun shareTreatmentAsPdf(
                 canvas.drawText(days, leftMargin + 15, yPosition, bodyPaint)
                 yPosition += lineHeight
                 
-                reminders.sortedBy { extractBaseName(it.medicationName) }.forEach { reminder ->
+                reminders.sortedBy { it.medicationName.lowercase() }.forEach { reminder ->
                     canvas.drawText("  • ${reminder.medicationName}", leftMargin + 20, yPosition, bodyPaint)
                     yPosition += lineHeight
                     canvas.drawText("    ${reminder.dosageFormatted} - ${reminder.timeFormatted}", leftMargin + 20, yPosition, lightPaint)
@@ -526,7 +514,7 @@ private fun shareTreatmentAsPdf(
             canvas.drawText("📅 MENSUALMENTE (${treatment.monthly.size})", leftMargin, yPosition, headerPaint)
             yPosition += 20f
             
-            treatment.monthly.sortedBy { extractBaseName(it.medicationName) }.forEach { reminder ->
+            treatment.monthly.sortedBy { it.medicationName.lowercase() }.forEach { reminder ->
                 canvas.drawText("• ${reminder.medicationName}", leftMargin + 15, yPosition, bodyPaint)
                 yPosition += lineHeight
                 canvas.drawText("  ${reminder.dosageFormatted} - ${reminder.scheduleFormatted} - ${reminder.timeFormatted}", leftMargin + 15, yPosition, lightPaint)
@@ -540,7 +528,7 @@ private fun shareTreatmentAsPdf(
             canvas.drawText("🔄 POR INTERVALO (${treatment.interval.size})", leftMargin, yPosition, headerPaint)
             yPosition += 20f
             
-            treatment.interval.sortedBy { extractBaseName(it.medicationName) }.forEach { reminder ->
+            treatment.interval.sortedBy { it.medicationName.lowercase() }.forEach { reminder ->
                 canvas.drawText("• ${reminder.medicationName}", leftMargin + 15, yPosition, bodyPaint)
                 yPosition += lineHeight
                 canvas.drawText("  ${reminder.dosageFormatted} - ${reminder.scheduleFormatted}", leftMargin + 15, yPosition, lightPaint)
