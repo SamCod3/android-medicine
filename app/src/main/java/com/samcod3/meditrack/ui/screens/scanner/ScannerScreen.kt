@@ -244,40 +244,54 @@ fun ScannerScreen(
                             onModeChanged = { scanMode = it }
                         )
                         
-                        // Zoom slider (only show if camera supports zoom > 1x)
+                        // Zoom chips (only show if camera supports zoom > 1x)
                         if (maxZoom > 1.1f) {
                             Spacer(modifier = Modifier.height(12.dp))
+                            
+                            // Calculate zoom levels: start at 1x, step 0.5x, cap at 3x or camera max
+                            val effectiveMaxZoom = minOf(maxZoom, 3f)
+                            val zoomLevels = remember(minZoom, effectiveMaxZoom) {
+                                val levels = mutableListOf<Float>()
+                                var level = 1f
+                                while (level <= effectiveMaxZoom) {
+                                    if (level >= minZoom) levels.add(level)
+                                    level += 0.5f
+                                }
+                                // Ensure we have at least the min zoom
+                                if (levels.isEmpty()) levels.add(minZoom)
+                                levels
+                            }
+                            
                             Row(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                                    .padding(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.ZoomIn,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Slider(
-                                    value = zoomRatio,
-                                    onValueChange = { newZoom ->
-                                        camera?.cameraControl?.setZoomRatio(newZoom)
-                                    },
-                                    valueRange = minZoom..maxZoom,
-                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color.White,
-                                        activeTrackColor = Color.White,
-                                        inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                                    )
-                                )
-                                Text(
-                                    text = "%.1fx".format(zoomRatio),
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.labelMedium
-                                )
+                                zoomLevels.forEach { level ->
+                                    val isSelected = kotlin.math.abs(zoomRatio - level) < 0.1f
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(
+                                                if (isSelected) Color.White 
+                                                else Color.Transparent
+                                            )
+                                            .clickable { 
+                                                camera?.cameraControl?.setZoomRatio(level)
+                                                zoomRatio = level
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (level == level.toInt().toFloat()) "${level.toInt()}x" else "%.1fx".format(level),
+                                            color = if (isSelected) Color.Black else Color.White,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
