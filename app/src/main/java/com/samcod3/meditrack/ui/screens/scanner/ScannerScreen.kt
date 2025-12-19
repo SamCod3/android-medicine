@@ -177,6 +177,12 @@ fun ScannerScreen(
                         camera = cam
                         imageCapture = imgCap
                         previewView = pv
+                        // Reset zoom indicator to match camera's actual zoom
+                        cam.cameraInfo.zoomState.value?.let { state ->
+                            zoomRatio = state.zoomRatio
+                            minZoom = state.minZoomRatio
+                            maxZoom = state.maxZoomRatio
+                        }
                     }
                 )
                 
