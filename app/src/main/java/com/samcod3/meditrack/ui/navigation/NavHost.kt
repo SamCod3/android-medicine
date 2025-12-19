@@ -45,11 +45,10 @@ fun MediTrackNavHost() {
     ) {
         composable(Screen.Profiles.route) {
             val viewModel: ProfileViewModel = koinViewModel()
-            val profiles by viewModel.profiles.collectAsState()
             
             ProfilesScreen(
                 onProfileSelected = { profileId ->
-                    val profile = profiles.find { it.id == profileId }
+                    val profile = viewModel.getProfileById(profileId)
                     val name = profile?.name ?: "Usuario"
                     navController.navigate(Screen.Main.createRoute(profileId, name)) {
                         popUpTo(Screen.Profiles.route) { inclusive = true }

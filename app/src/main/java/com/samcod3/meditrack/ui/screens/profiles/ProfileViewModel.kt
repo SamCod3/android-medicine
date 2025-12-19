@@ -24,10 +24,6 @@ class ProfileViewModel(
 
     private val _uiState = MutableStateFlow(ProfilesUiState())
     val uiState: StateFlow<ProfilesUiState> = _uiState.asStateFlow()
-    
-    // Direct access to profiles list for navigation
-    val profiles: StateFlow<List<Profile>> 
-        get() = MutableStateFlow(_uiState.value.profiles)
 
     init {
         loadProfiles()
@@ -50,6 +46,13 @@ class ProfileViewModel(
                     )
                 }
         }
+    }
+    
+    /**
+     * Gets a profile by ID from the current state.
+     */
+    fun getProfileById(profileId: String): Profile? {
+        return _uiState.value.profiles.find { it.id == profileId }
     }
 
     fun createProfile(name: String) {
