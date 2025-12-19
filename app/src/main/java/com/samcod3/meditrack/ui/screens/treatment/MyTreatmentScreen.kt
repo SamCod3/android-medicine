@@ -133,11 +133,19 @@ fun MyTreatmentScreen(
             ) {
                 // DAILY
                 if (treatment.daily.isNotEmpty()) {
+                    // Group reminders by medication
+                    val dailyGrouped = treatment.daily
+                        .groupBy { it.medicationId }
+                        .map { (_, reminders) -> 
+                            reminders.first().medicationName to reminders 
+                        }
+                        .sortedBy { it.first.lowercase() }
+                    
                     item(key = "daily-header") {
                         CollapsibleScheduleHeader(
                             icon = Icons.Default.Today,
                             title = "Todos los días",
-                            count = treatment.daily.size,
+                            count = dailyGrouped.size,
                             color = MaterialTheme.colorScheme.primary,
                             isExpanded = dailyExpanded,
                             onToggle = { dailyExpanded = !dailyExpanded }
@@ -145,12 +153,12 @@ fun MyTreatmentScreen(
                     }
                     
                     if (dailyExpanded) {
-                        // Sort alphabetically by medication name
-                        val sortedDaily = treatment.daily.sortedBy { it.medicationName.lowercase() }
-                        items(sortedDaily, key = { "daily-${it.id}" }) { reminder ->
-                            TreatmentReminderCard(
-                                reminder = reminder,
-                                onClick = { onMedicationClick(reminder.nationalCode) }
+                        items(dailyGrouped, key = { "daily-${it.second.first().medicationId}" }) { (name, reminders) ->
+                            GroupedMedicationCard(
+                                medicationName = name,
+                                nationalCode = reminders.first().nationalCode,
+                                reminders = reminders,
+                                onClick = { onMedicationClick(reminders.first().nationalCode) }
                             )
                         }
                     }
@@ -158,11 +166,16 @@ fun MyTreatmentScreen(
                 
                 // WEEKLY
                 if (treatment.weekly.isNotEmpty()) {
+                    // Count unique medications across all weekly reminders
+                    val allWeeklyMeds = treatment.weekly.values.flatten()
+                        .groupBy { it.medicationId }
+                        .size
+                    
                     item(key = "weekly-header") {
                         CollapsibleScheduleHeader(
                             icon = Icons.Default.CalendarToday,
                             title = "Semanalmente",
-                            count = treatment.weekly.values.sumOf { it.size },
+                            count = allWeeklyMeds,
                             color = MaterialTheme.colorScheme.secondary,
                             isExpanded = weeklyExpanded,
                             onToggle = { weeklyExpanded = !weeklyExpanded }
@@ -180,12 +193,20 @@ fun MyTreatmentScreen(
                                     modifier = Modifier.padding(start = 8.dp, top = 4.dp)
                                 )
                             }
-                            val sortedReminders = reminders.sortedBy { it.medicationName.lowercase() }
-                            items(sortedReminders, key = { "weekly-${it.id}" }) { reminder ->
-                                TreatmentReminderCard(
-                                    reminder = reminder,
+                            
+                            // Group by medication
+                            val weeklyGrouped = reminders
+                                .groupBy { it.medicationId }
+                                .map { (_, meds) -> meds.first().medicationName to meds }
+                                .sortedBy { it.first.lowercase() }
+                            
+                            items(weeklyGrouped, key = { "weekly-$days-${it.second.first().medicationId}" }) { (name, meds) ->
+                                GroupedMedicationCard(
+                                    medicationName = name,
+                                    nationalCode = meds.first().nationalCode,
+                                    reminders = meds,
                                     showSchedule = false,
-                                    onClick = { onMedicationClick(reminder.nationalCode) }
+                                    onClick = { onMedicationClick(meds.first().nationalCode) }
                                 )
                             }
                         }
@@ -194,11 +215,17 @@ fun MyTreatmentScreen(
                 
                 // MONTHLY
                 if (treatment.monthly.isNotEmpty()) {
+                    // Group reminders by medication
+                    val monthlyGrouped = treatment.monthly
+                        .groupBy { it.medicationId }
+                        .map { (_, reminders) -> reminders.first().medicationName to reminders }
+                        .sortedBy { it.first.lowercase() }
+                    
                     item(key = "monthly-header") {
                         CollapsibleScheduleHeader(
                             icon = Icons.Default.CalendarMonth,
                             title = "Mensualmente",
-                            count = treatment.monthly.size,
+                            count = monthlyGrouped.size,
                             color = MaterialTheme.colorScheme.tertiary,
                             isExpanded = monthlyExpanded,
                             onToggle = { monthlyExpanded = !monthlyExpanded }
@@ -206,11 +233,12 @@ fun MyTreatmentScreen(
                     }
                     
                     if (monthlyExpanded) {
-                        val sortedMonthly = treatment.monthly.sortedBy { it.medicationName.lowercase() }
-                        items(sortedMonthly, key = { "monthly-${it.id}" }) { reminder ->
-                            TreatmentReminderCard(
-                                reminder = reminder,
-                                onClick = { onMedicationClick(reminder.nationalCode) }
+                        items(monthlyGrouped, key = { "monthly-${it.second.first().medicationId}" }) { (name, meds) ->
+                            GroupedMedicationCard(
+                                medicationName = name,
+                                nationalCode = meds.first().nationalCode,
+                                reminders = meds,
+                                onClick = { onMedicationClick(meds.first().nationalCode) }
                             )
                         }
                     }
@@ -218,11 +246,17 @@ fun MyTreatmentScreen(
                 
                 // INTERVAL
                 if (treatment.interval.isNotEmpty()) {
+                    // Group reminders by medication
+                    val intervalGrouped = treatment.interval
+                        .groupBy { it.medicationId }
+                        .map { (_, reminders) -> reminders.first().medicationName to reminders }
+                        .sortedBy { it.first.lowercase() }
+                    
                     item(key = "interval-header") {
                         CollapsibleScheduleHeader(
                             icon = Icons.Default.EventRepeat,
                             title = "Por intervalo",
-                            count = treatment.interval.size,
+                            count = intervalGrouped.size,
                             color = MaterialTheme.colorScheme.error,
                             isExpanded = intervalExpanded,
                             onToggle = { intervalExpanded = !intervalExpanded }
@@ -230,11 +264,12 @@ fun MyTreatmentScreen(
                     }
                     
                     if (intervalExpanded) {
-                        val sortedInterval = treatment.interval.sortedBy { it.medicationName.lowercase() }
-                        items(sortedInterval, key = { "interval-${it.id}" }) { reminder ->
-                            TreatmentReminderCard(
-                                reminder = reminder,
-                                onClick = { onMedicationClick(reminder.nationalCode) }
+                        items(intervalGrouped, key = { "interval-${it.second.first().medicationId}" }) { (name, meds) ->
+                            GroupedMedicationCard(
+                                medicationName = name,
+                                nationalCode = meds.first().nationalCode,
+                                reminders = meds,
+                                onClick = { onMedicationClick(meds.first().nationalCode) }
                             )
                         }
                     }
@@ -344,8 +379,10 @@ private fun CollapsibleScheduleHeader(
 }
 
 @Composable
-private fun TreatmentReminderCard(
-    reminder: Reminder,
+private fun GroupedMedicationCard(
+    medicationName: String,
+    nationalCode: String,
+    reminders: List<Reminder>,
     showSchedule: Boolean = true,
     onClick: () -> Unit
 ) {
@@ -362,50 +399,73 @@ private fun TreatmentReminderCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Icon(
                 imageVector = Icons.Default.Medication,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier
+                    .size(24.dp)
+                    .padding(top = 2.dp)
             )
             
             Spacer(modifier = Modifier.width(12.dp))
             
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = reminder.medicationName,
+                    text = medicationName,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold
                 )
-                Text(
-                    text = reminder.dosageFormatted,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                if (showSchedule) {
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Group reminders with same dosage together
+                val dosageGroups = reminders.groupBy { it.dosageFormatted }
+                
+                dosageGroups.forEach { (dosage, dosageReminders) ->
+                    val times = dosageReminders
+                        .sortedBy { it.hour * 60 + it.minute }
+                        .map { it.timeFormatted }
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = dosage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        
+                        if (dosageReminders.size > 1) {
+                            Text(
+                                text = " × ${dosageReminders.size}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Text(
+                            text = "(${times.joinToString(", ")})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                if (showSchedule && reminders.isNotEmpty()) {
                     Text(
-                        text = reminder.scheduleFormatted,
+                        text = reminders.first().scheduleFormatted,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-            }
-            
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = reminder.timeFormatted,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                )
             }
         }
     }
