@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
@@ -221,31 +222,18 @@ private fun LeafletContent(
             )
         }
         
-        // Section index - opens reading mode when selected
+        // Single card to open reading mode
         if (sections.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = "Prospecto",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
-            // Section list as clickable items
-            sections.forEachIndexed { index, section ->
-                SectionIndexItem(
-                    sectionNumber = index + 1,
-                    title = cleanSectionTitle(section.title),
-                    onClick = {
-                        selectedSectionIndex = index
-                        isReadingMode = true
-                        coroutineScope.launch {
-                            readingListState.scrollToItem(0)
-                        }
+            ReadLeafletCard(
+                sectionCount = sections.size,
+                onClick = {
+                    selectedSectionIndex = 0
+                    isReadingMode = true
+                    coroutineScope.launch {
+                        readingListState.scrollToItem(0)
                     }
-                )
-            }
+                }
+            )
         } else {
             // Fallback for when segmented content is not available
             NoSectionsAvailable(medication)
@@ -354,50 +342,61 @@ private fun cleanSectionTitle(title: String): String {
 }
 
 @Composable
-private fun SectionIndexItem(
-    sectionNumber: Int,
-    title: String,
+private fun ReadLeafletCard(
+    sectionCount: Int,
     onClick: () -> Unit
 ) {
-    Surface(
+    Card(
         onClick = onClick,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        ),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Book icon
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = sectionNumber.toString(),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(24.dp)
                 )
             }
             
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(16.dp))
             
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Leer Prospecto",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "$sectionCount secciones",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = "Leer",
-                tint = MaterialTheme.colorScheme.primary
+                contentDescription = "Abrir",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
             )
         }
     }
