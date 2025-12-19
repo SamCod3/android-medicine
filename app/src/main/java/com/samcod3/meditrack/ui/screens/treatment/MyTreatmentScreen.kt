@@ -1,5 +1,10 @@
 package com.samcod3.meditrack.ui.screens.treatment
 
+import android.content.Context
+import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +25,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,18 +44,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import com.samcod3.meditrack.domain.model.Reminder
 import org.koin.androidx.compose.koinViewModel
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyTreatmentScreen(
+    profileName: String,
     onBackClick: () -> Unit,
     viewModel: MyTreatmentViewModel = koinViewModel()
 ) {
     val treatment by viewModel.treatment.collectAsState()
+    val context = LocalContext.current
     
     Scaffold(
         topBar = {
@@ -67,6 +82,20 @@ fun MyTreatmentScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    if (treatment.totalCount > 0) {
+                        IconButton(
+                            onClick = {
+                                shareTreatmentAsPdf(context, profileName, treatment)
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Share,
+                                contentDescription = "Compartir tratamiento"
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -306,5 +335,165 @@ private fun TreatmentReminderCard(
                 )
             }
         }
+    }
+}
+
+/**
+ * Generates a PDF with the patient's treatment and shares it.
+ */
+private fun shareTreatmentAsPdf(
+    context: Context,
+    patientName: String,
+    treatment: TreatmentGrouped
+) {
+    try {
+        val pdfDocument = PdfDocument()
+        val pageWidth = 595 // A4 width in points
+        val pageHeight = 842 // A4 height in points
+        
+        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas: Canvas = page.canvas
+        
+        // Paints
+        val titlePaint = Paint().apply {
+            textSize = 24f
+            isFakeBoldText = true
+            color = android.graphics.Color.BLACK
+        }
+        
+        val subtitlePaint = Paint().apply {
+            textSize = 18f
+            isFakeBoldText = true
+            color = android.graphics.Color.DKGRAY
+        }
+        
+        val headerPaint = Paint().apply {
+            textSize = 14f
+            isFakeBoldText = true
+            color = android.graphics.Color.parseColor("#6750A4") // Primary color
+        }
+        
+        val bodyPaint = Paint().apply {
+            textSize = 12f
+            color = android.graphics.Color.BLACK
+        }
+        
+        val lightPaint = Paint().apply {
+            textSize = 10f
+            color = android.graphics.Color.GRAY
+        }
+        
+        var yPosition = 50f
+        val leftMargin = 40f
+        val lineHeight = 18f
+        
+        // Header: Patient Name
+        canvas.drawText("Tratamiento de $patientName", leftMargin, yPosition, titlePaint)
+        yPosition += 30f
+        
+        // Date
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale("es", "ES"))
+        canvas.drawText("Generado el ${dateFormat.format(Date())}", leftMargin, yPosition, lightPaint)
+        yPosition += 40f
+        
+        // Summary
+        canvas.drawText("Resumen: ${treatment.totalCount} medicamentos activos", leftMargin, yPosition, subtitlePaint)
+        yPosition += 35f
+        
+        // Daily medications
+        if (treatment.daily.isNotEmpty()) {
+            canvas.drawText("📅 TODOS LOS DÍAS (${treatment.daily.size})", leftMargin, yPosition, headerPaint)
+            yPosition += 20f
+            
+            treatment.daily.forEach { reminder ->
+                canvas.drawText("• ${reminder.medicationName}", leftMargin + 15, yPosition, bodyPaint)
+                yPosition += lineHeight
+                canvas.drawText("  ${reminder.dosageFormatted} - ${reminder.timeFormatted}", leftMargin + 15, yPosition, lightPaint)
+                yPosition += lineHeight + 5
+            }
+            yPosition += 15f
+        }
+        
+        // Weekly medications
+        if (treatment.weekly.isNotEmpty()) {
+            val weeklyCount = treatment.weekly.values.sumOf { it.size }
+            canvas.drawText("📆 SEMANALMENTE ($weeklyCount)", leftMargin, yPosition, headerPaint)
+            yPosition += 20f
+            
+            treatment.weekly.forEach { (days, reminders) ->
+                canvas.drawText(days, leftMargin + 15, yPosition, bodyPaint)
+                yPosition += lineHeight
+                
+                reminders.forEach { reminder ->
+                    canvas.drawText("  • ${reminder.medicationName}", leftMargin + 20, yPosition, bodyPaint)
+                    yPosition += lineHeight
+                    canvas.drawText("    ${reminder.dosageFormatted} - ${reminder.timeFormatted}", leftMargin + 20, yPosition, lightPaint)
+                    yPosition += lineHeight + 3
+                }
+            }
+            yPosition += 15f
+        }
+        
+        // Monthly medications
+        if (treatment.monthly.isNotEmpty()) {
+            canvas.drawText("📅 MENSUALMENTE (${treatment.monthly.size})", leftMargin, yPosition, headerPaint)
+            yPosition += 20f
+            
+            treatment.monthly.forEach { reminder ->
+                canvas.drawText("• ${reminder.medicationName}", leftMargin + 15, yPosition, bodyPaint)
+                yPosition += lineHeight
+                canvas.drawText("  ${reminder.dosageFormatted} - ${reminder.scheduleFormatted} - ${reminder.timeFormatted}", leftMargin + 15, yPosition, lightPaint)
+                yPosition += lineHeight + 5
+            }
+            yPosition += 15f
+        }
+        
+        // Interval medications
+        if (treatment.interval.isNotEmpty()) {
+            canvas.drawText("🔄 POR INTERVALO (${treatment.interval.size})", leftMargin, yPosition, headerPaint)
+            yPosition += 20f
+            
+            treatment.interval.forEach { reminder ->
+                canvas.drawText("• ${reminder.medicationName}", leftMargin + 15, yPosition, bodyPaint)
+                yPosition += lineHeight
+                canvas.drawText("  ${reminder.dosageFormatted} - ${reminder.scheduleFormatted}", leftMargin + 15, yPosition, lightPaint)
+                yPosition += lineHeight + 5
+            }
+        }
+        
+        // Footer
+        yPosition = pageHeight - 40f
+        canvas.drawText("Generado por MediTrack", leftMargin, yPosition, lightPaint)
+        
+        pdfDocument.finishPage(page)
+        
+        // Save to cache directory
+        val fileName = "Tratamiento_${patientName.replace(" ", "_")}_${System.currentTimeMillis()}.pdf"
+        val file = File(context.cacheDir, fileName)
+        FileOutputStream(file).use { outputStream ->
+            pdfDocument.writeTo(outputStream)
+        }
+        pdfDocument.close()
+        
+        // Share the PDF
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            file
+        )
+        
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Tratamiento de $patientName")
+            putExtra(Intent.EXTRA_TEXT, "Adjunto el tratamiento médico de $patientName generado desde MediTrack.")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        
+        context.startActivity(Intent.createChooser(shareIntent, "Compartir tratamiento"))
+        
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }

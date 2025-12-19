@@ -29,7 +29,10 @@ sealed class Screen(val route: String) {
         fun createRoute(medicationId: String, medicationName: String) = 
             "reminders/$medicationId/${java.net.URLEncoder.encode(medicationName, "UTF-8")}"
     }
-    data object Treatment : Screen("treatment")
+    data object Treatment : Screen("treatment/{profileName}") {
+        fun createRoute(profileName: String) = 
+            "treatment/${java.net.URLEncoder.encode(profileName, "UTF-8")}"
+    }
 }
 
 @Composable
@@ -78,7 +81,7 @@ fun MediTrackNavHost() {
                     navController.navigate(Screen.Reminders.createRoute(medicationId, medicationName))
                 },
                 onTreatmentClick = {
-                    navController.navigate(Screen.Treatment.route)
+                    navController.navigate(Screen.Treatment.createRoute(profileName))
                 },
                 onChangeProfile = {
                     navController.navigate(Screen.Profiles.route) {
@@ -135,8 +138,23 @@ fun MediTrackNavHost() {
             )
         }
         
-        composable(Screen.Treatment.route) {
+        composable(
+            route = Screen.Treatment.route,
+            arguments = listOf(
+                navArgument("profileName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val profileName = try {
+                java.net.URLDecoder.decode(
+                    backStackEntry.arguments?.getString("profileName") ?: "",
+                    "UTF-8"
+                )
+            } catch (e: Exception) {
+                backStackEntry.arguments?.getString("profileName") ?: "Usuario"
+            }
+            
             MyTreatmentScreen(
+                profileName = profileName,
                 onBackClick = { navController.popBackStack() }
             )
         }
