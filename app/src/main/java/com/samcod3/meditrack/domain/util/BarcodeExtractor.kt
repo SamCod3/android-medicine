@@ -86,28 +86,23 @@ object BarcodeExtractor {
     
     /**
      * Finds National Code from OCR text.
-     * Simplified to only look for explicit CN labels: "C.N. 123456" or "CN: 123456.7"
+     * Looks for the format: 6 digits + dot + 1 digit (e.g., "713615.6")
+     * Returns only the 6 digits (without the dot and check digit).
      */
     fun findCNInText(text: String): String? {
-        Log.d(TAG, "Scanning OCR text for CN label")
+        Log.d(TAG, "Scanning OCR text for CN pattern XXXXXX.X")
         
-        // Look for explicit CN label patterns:
-        // - "C.N. 123456" or "C.N. 123456.7"
-        // - "CN: 123456" or "CN 123456"
-        // - "C.N: 123456.7"
-        val cnLabelRegex = Regex(
-            """(?:C\.?\s*N\.?|C\.N)\s*[:\.]?\s*(\d{6,7})(?:\.\d)?""", 
-            RegexOption.IGNORE_CASE
-        )
+        // Pattern: 6 digits, dot, 1 digit (e.g., "713615.6")
+        val cnPatternRegex = Regex("""(\d{6})\.(\d)""")
         
-        val match = cnLabelRegex.find(text)
+        val match = cnPatternRegex.find(text)
         if (match != null) {
-            val cn = match.groupValues[1]
-            Log.d(TAG, "Found CN from label: $cn")
+            val cn = match.groupValues[1] // Just the 6 digits
+            Log.d(TAG, "Found CN: $cn (full: ${match.value})")
             return cn
         }
         
-        Log.d(TAG, "No CN label found in text")
+        Log.d(TAG, "No CN pattern found in text")
         return null
     }
 }

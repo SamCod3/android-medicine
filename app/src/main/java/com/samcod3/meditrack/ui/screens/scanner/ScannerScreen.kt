@@ -194,7 +194,7 @@ fun ScannerScreen(
                                             // No CN found - give helpful feedback
                                             Toast.makeText(
                                                 context, 
-                                                "No se encontró 'C.N.'. Centra el código y vuelve a intentar", 
+                                            "No se encontró código (ej: 713615.6). Centra y reintenta", 
                                                 Toast.LENGTH_LONG
                                             ).show()
                                         }
@@ -502,7 +502,7 @@ private fun ScanOverlay(scanMode: ScanMode) {
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "Busca en la caja:",
+                        text = "Busca este formato:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.8f),
                         textAlign = TextAlign.Center
@@ -510,7 +510,7 @@ private fun ScanOverlay(scanMode: ScanMode) {
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
-                    // Visual example of CN format
+                    // Visual example of format (6 digits + dot + digit)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -518,13 +518,13 @@ private fun ScanOverlay(scanMode: ScanMode) {
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = "C.N. ",
+                            text = "713615",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
                         )
                         Text(
-                            text = "123456.7",
+                            text = ".6",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
