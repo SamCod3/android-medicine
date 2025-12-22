@@ -91,6 +91,10 @@ class ReminderRepositoryImpl(
     override suspend fun setReminderEnabled(id: String, enabled: Boolean) {
         reminderDao.setEnabled(id, enabled)
     }
+
+    override suspend fun moveReminders(fromMedId: String, toMedId: String) {
+        reminderDao.moveReminders(fromMedId, toMedId)
+    }
     
     private suspend fun ReminderEntity.toDomain(): Reminder {
         val medication = medicationDao.getMedicationById(medicationId)

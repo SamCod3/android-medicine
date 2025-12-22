@@ -14,6 +14,9 @@ interface ReminderDao {
     
     @Query("SELECT * FROM reminders WHERE medicationId = :medicationId ORDER BY hour, minute")
     fun getRemindersForMedication(medicationId: String): Flow<List<ReminderEntity>>
+
+    @Query("UPDATE reminders SET medicationId = :toMedId WHERE medicationId = :fromMedId")
+    suspend fun moveReminders(fromMedId: String, toMedId: String)
     
     @Query("SELECT * FROM reminders WHERE enabled = 1 ORDER BY hour, minute")
     fun getAllEnabledReminders(): Flow<List<ReminderEntity>>

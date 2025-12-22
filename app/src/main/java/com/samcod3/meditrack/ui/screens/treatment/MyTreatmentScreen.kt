@@ -5,11 +5,17 @@ import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
+import android.net.Uri
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -27,26 +33,42 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.DataObject
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,9 +77,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.samcod3.meditrack.domain.model.ImportStatus
 import com.samcod3.meditrack.domain.model.Reminder
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.koin.androidx.compose.koinViewModel
 import java.io.File
 import java.io.FileOutputStream
@@ -76,6 +105,45 @@ fun MyTreatmentScreen(
 ) {
     val treatment by viewModel.treatment.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    // JSON Picker for backup import
+    val jsonPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { jsonUri ->
+            scope.launch {
+                try {
+                    val jsonText = context.contentResolver.openInputStream(jsonUri)?.bufferedReader()?.use { it.readText() } ?: ""
+                    if (jsonText.isNotBlank()) {
+                        viewModel.importBackup(jsonText) { result ->
+                            if (result > 0) {
+                                android.widget.Toast.makeText(
+                                    context, 
+                                    "Importados $result medicamentos", 
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                // Error is stored in viewModel.backupError
+                                val error = viewModel.backupError.value ?: "Error desconocido"
+                                android.widget.Toast.makeText(
+                                    context, 
+                                    "Falló la importación: $error", 
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(
+                        context, 
+                        "Error al leer el archivo: ${e.message}", 
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -96,6 +164,44 @@ fun MyTreatmentScreen(
                     }
                 },
                 actions = {
+                    var showImportMenu by remember { mutableStateOf(false) }
+                    
+                    // Import button with dropdown menu
+                    Box {
+                        IconButton(onClick = { showImportMenu = true }) {
+                            Icon(
+                                Icons.Default.CloudUpload,
+                                contentDescription = "Importar tratamiento"
+                            )
+                        }
+                        
+                        DropdownMenu(
+                            expanded = showImportMenu,
+                            onDismissRequest = { showImportMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Importar desde JSON") },
+                                onClick = {
+                                    showImportMenu = false
+                                    jsonPickerLauncher.launch("application/json")
+                                },
+                                leadingIcon = { Icon(Icons.Default.DataObject, null) }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Exportar backup JSON") },
+                                onClick = {
+                                    showImportMenu = false
+                                    viewModel.exportBackup { json ->
+                                        shareBackupJson(context, profileName, json)
+                                    }
+                                },
+                                leadingIcon = { Icon(Icons.Default.CloudDownload, null) }
+                            )
+                        }
+                    }
+                    
+                    // Share button (only if has content)
                     if (treatment.totalCount > 0) {
                         IconButton(
                             onClick = {
@@ -245,7 +351,6 @@ fun MyTreatmentScreen(
                     }
                 }
                 
-                // INTERVAL
                 if (treatment.interval.isNotEmpty()) {
                     // Group reminders by medication
                     val intervalGrouped = treatment.interval
@@ -275,10 +380,67 @@ fun MyTreatmentScreen(
                         }
                     }
                 }
+
+                // UNSCHEDULED (Added)
+                if (treatment.unscheduled.isNotEmpty()) {
+                    item(key = "unscheduled-header") {
+                        // Using a distinct style for unscheduled
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier.fillMaxWidth().clickable(enabled = false) {}
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Medication, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    "Sin pauta definida (${treatment.unscheduled.size})",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    
+                    items(treatment.unscheduled, key = { "unscheduled-${it.id}" }) { medication ->
+                        Card(
+                            onClick = { onMedicationClick(medication.nationalCode) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.Transparent) // Transparent to blend or use default
+                        ) {
+                           Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp, horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = medication.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "Pulsa para configurar recordatorio",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.rotate(180f), tint = MaterialTheme.colorScheme.outline) // Forward arrow
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                        }
+                    }
+                }
             }
         }
     }
 }
+
 
 
 @Composable
@@ -631,4 +793,31 @@ private fun shareTreatmentAsPdf(
     } catch (e: Exception) {
         e.printStackTrace()
     }
+}
+
+/**
+ * Shares a JSON backup via Intent.
+ */
+private fun shareBackupJson(context: Context, profileName: String, jsonContent: String) {
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val filename = "meditrack_backup_${profileName}_${sdf.format(Date())}.json"
+    
+    val file = File(context.cacheDir, filename)
+    FileOutputStream(file).use { fos ->
+        fos.write(jsonContent.toByteArray())
+    }
+    
+    val uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.provider",
+        file
+    )
+    
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/json"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    
+    context.startActivity(Intent.createChooser(shareIntent, "Compartir backup de $profileName"))
 }

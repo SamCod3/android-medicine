@@ -22,11 +22,12 @@ val appModule = module {
             drugRepository = get(), 
             userMedicationRepository = get(),
             reminderRepository = get(),
-            medicationDao = get()
+            medicationDao = get(),
+            aiLeafletParser = get()
         ) 
     }
     viewModel { ProfileViewModel(get()) }
-    viewModel { SearchViewModel(get()) }
+    viewModel { SearchViewModel(get(), get()) }
     // HomeViewModel needs: profileId, userMedicationRepo
     viewModel { params -> 
         HomeViewModel(
@@ -53,7 +54,9 @@ val appModule = module {
     viewModel { params ->
         MyTreatmentViewModel(
             profileId = params[0],
-            reminderRepository = get()
+            reminderRepository = get(),
+            userMedicationRepository = get(),
+            backupUseCase = get()
         )
     }
 }

@@ -249,6 +249,27 @@ class DrugRepositoryImpl(
          }
     }
 
+    override suspend fun getLeafletHtml(medication: Medication): Result<String> {
+        return withContext(Dispatchers.IO) {
+            if (medication.leafletUrl.isNullOrBlank()) {
+                return@withContext Result.failure(Exception("URL de prospecto no disponible"))
+            }
+
+            try {
+                Log.d(TAG, "Downloading leaflet HTML from: ${medication.leafletUrl}")
+                val response = cimaApi.downloadUrl(medication.leafletUrl)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!.string())
+                } else {
+                    Result.failure(Exception("Error descargando prospecto: ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error downloading leaflet HTML", e)
+                Result.failure(e)
+            }
+        }
+    }
+
     override suspend fun searchMedications(query: String): Result<List<Medication>> {
         return withContext(Dispatchers.IO) {
             try {

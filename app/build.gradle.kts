@@ -92,6 +92,8 @@ dependencies {
     // ML Kit Barcode
     implementation(libs.mlkit.barcode)
     implementation(libs.mlkit.text)
+    implementation(libs.mlkit.genai)
+    implementation(libs.mlkit.genai.prompt)
     
     // Coil
     implementation(libs.coil.compose)

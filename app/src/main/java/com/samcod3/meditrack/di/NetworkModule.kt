@@ -1,18 +1,23 @@
 package com.samcod3.meditrack.di
 
+import android.content.Context
 import android.util.Log
 import com.samcod3.meditrack.data.remote.api.CimaApiService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import okhttp3.Cache
+import okhttp3.CacheControl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
+import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -61,6 +66,29 @@ class CimaResponseInterceptor : Interceptor {
     }
 }
 
+/**
+ * Interceptor to add cache headers for leaflet HTML responses.
+ * CIMA API doesn't set cache headers, so we add them for 7-day caching.
+ */
+class LeafletCacheInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val response = chain.proceed(request)
+        
+        // Only cache leaflet HTML responses (doc URLs)
+        val url = request.url.toString()
+        if (url.contains("/cima/dochtml/") || url.contains("/cima/pdfs/")) {
+            Log.d("LeafletCache", "Caching leaflet response: $url")
+            return response.newBuilder()
+                .header("Cache-Control", "public, max-age=604800") // 7 days
+                .removeHeader("Pragma") // Remove no-cache directives
+                .build()
+        }
+        
+        return response
+    }
+}
+
 val networkModule = module {
     
     single {
@@ -76,9 +104,18 @@ val networkModule = module {
     }
     
     single {
+        // 10MB HTTP cache for leaflet HTML
+        val cacheDir = File(androidContext().cacheDir, "http_cache")
+        val cacheSize = 10L * 1024L * 1024L // 10 MB
+        Cache(cacheDir, cacheSize)
+    }
+    
+    single {
         OkHttpClient.Builder()
+            .cache(get()) // HTTP Response Cache
             .addInterceptor(CimaResponseInterceptor())  // Application interceptor - catches exceptions
             .addInterceptor(get<HttpLoggingInterceptor>())
+            .addNetworkInterceptor(LeafletCacheInterceptor()) // Network interceptor for cache headers
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()

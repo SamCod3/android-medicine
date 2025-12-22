@@ -1,0 +1,361 @@
+{
+  "version": 1,
+  "exportDate": 1734879600000,
+  "profile": {
+    "name": "mama",
+    "notes": null
+  },
+  "medications": [
+    {
+      "nationalCode": "654321",
+      "name": "EUTIROX 25 microgramos COMPRIMIDOS",
+      "description": "Levotiroxina - Tiroides",
+      "notes": "Tomar solo con agua. Esperar 45 min antes de desayunar.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 7,
+          "minute": 50,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "654322",
+      "name": "EUTIROX 50 microgramos COMPRIMIDOS",
+      "description": "Levotiroxina - Tiroides",
+      "notes": "Tomar junto con Eutirox 25. Esperar 45 min antes de desayunar.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 7,
+          "minute": 50,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "717291",
+      "name": "ENALAPRIL SANDOZ 5 mg COMPRIMIDOS EFG",
+      "description": "Para la tensión arterial",
+      "notes": null,
+      "active": true,
+      "reminders": [
+        {
+          "hour": 8,
+          "minute": 30,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "661234",
+      "name": "PAROXETINA MABO 10 mg COMPRIMIDOS EFG",
+      "description": "Antidepresivo",
+      "notes": "Tomarla con alimentos reduce las molestias gástricas.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 8,
+          "minute": 30,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "713000",
+      "name": "TRIMBOW 87 MICROGRAMOS/5 MICROGRAMOS/9 MICROGRAMOS SOLUCION PARA INHALACION",
+      "description": "Inhalador bronquial",
+      "notes": "Enjuagar la boca con agua después de usarlo.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 8,
+          "minute": 30,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 2,
+          "dosageType": "APLICACION",
+          "dosagePortion": null,
+          "enabled": true
+        },
+        {
+          "hour": 21,
+          "minute": 45,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 2,
+          "dosageType": "APLICACION",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "662345",
+      "name": "MONOLITUM FLAS 15 mg COMPRIMIDOS BUCODISPERSABLES",
+      "description": "Protector gástrico",
+      "notes": "Protege el estómago para las comidas.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 8,
+          "minute": 15,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        },
+        {
+          "hour": 18,
+          "minute": 30,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "656789",
+      "name": "CASENLAX 10 g POLVO PARA SOLUCION ORAL EN SOBRE",
+      "description": "Macrogol - Laxante",
+      "notes": "No interfiere con la absorción de las pastillas de la mañana.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 11,
+          "minute": 45,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "SOBRE",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "663456",
+      "name": "FLUMILEXA 600 MG COMPRIMIDOS EFERVESCENTES EFG",
+      "description": "Acetilcisteína - Mucolítico",
+      "notes": null,
+      "active": true,
+      "reminders": [
+        {
+          "hour": 11,
+          "minute": 45,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "664567",
+      "name": "SINTROM 4 mg COMPRIMIDOS",
+      "description": "Anticoagulante",
+      "notes": "Control: Sé estricto con esta hora. Mantén estable la ingesta de verduras verdes (vitamina K).",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 19,
+          "minute": 0,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "665678",
+      "name": "MIRTAZAPINA SANDOZ FARMACÉUTICA 15 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG",
+      "description": "Antidepresivo - Sueño",
+      "notes": "Da sueño, ideal para descansar.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 22,
+          "minute": 0,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "666789",
+      "name": "QUETIAPINA SANDOZ FARMACEUTICA 100 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG",
+      "description": "Antipsicótico - Sueño",
+      "notes": "Da sueño, ideal para descansar.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 22,
+          "minute": 0,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "667890",
+      "name": "XUMADOL 1 g GRANULADO EFERVESCENTE EFG",
+      "description": "Paracetamol - Analgésico",
+      "notes": "Antes de dormir para aguantar la noche sin dolor.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 22,
+          "minute": 0,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "COMPRIMIDO",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "650001",
+      "name": "RIVOTRIL 2,5 mg/ml GOTAS ORALES EN SOLUCION",
+      "description": "Clonazepam - Antiepiléptico",
+      "notes": null,
+      "active": true,
+      "reminders": [
+        {
+          "hour": 8,
+          "minute": 40,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 2,
+          "dosageType": "GOTA",
+          "dosagePortion": null,
+          "enabled": true
+        },
+        {
+          "hour": 20,
+          "minute": 0,
+          "scheduleType": "DAILY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 2,
+          "dosageType": "GOTA",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "660002",
+      "name": "HIDROFEROL 0,266 mg CAPSULAS BLANDAS",
+      "description": "Vitamina D",
+      "notes": "Con la comida del mediodía.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 12,
+          "minute": 0,
+          "scheduleType": "MONTHLY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 1,
+          "dosageQuantity": 1,
+          "dosageType": "CAPSULAS",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "nationalCode": "660003",
+      "name": "OPTOVITE B12 1000 mcg SOLUCION INYECTABLE",
+      "description": "Vitamina B12 inyectable",
+      "notes": "Preferiblemente por la mañana.",
+      "active": true,
+      "reminders": [
+        {
+          "hour": 10,
+          "minute": 0,
+          "scheduleType": "MONTHLY",
+          "daysOfWeek": 0,
+          "intervalDays": 1,
+          "dayOfMonth": 10,
+          "dosageQuantity": 1,
+          "dosageType": "APLICACION",
+          "dosagePortion": null,
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

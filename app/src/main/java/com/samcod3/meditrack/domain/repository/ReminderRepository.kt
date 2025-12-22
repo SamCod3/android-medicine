@@ -28,4 +28,5 @@ interface ReminderRepository {
     suspend fun updateReminder(reminder: Reminder)
     suspend fun deleteReminder(id: String)
     suspend fun setReminderEnabled(id: String, enabled: Boolean)
+    suspend fun moveReminders(fromMedId: String, toMedId: String)
 }

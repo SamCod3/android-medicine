@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
@@ -40,6 +41,8 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -86,12 +89,18 @@ import com.samcod3.meditrack.R
 import com.samcod3.meditrack.domain.model.LeafletSection
 import com.samcod3.meditrack.domain.model.Medication
 import com.samcod3.meditrack.domain.model.Reminder
+import com.samcod3.meditrack.domain.model.ParsedLeaflet
+import com.samcod3.meditrack.domain.model.ParsedSection
+import com.samcod3.meditrack.domain.model.ContentBlock
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
+import com.samcod3.meditrack.domain.model.LeafletSummary
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import java.io.File
 import java.io.FileOutputStream
 
@@ -107,6 +116,7 @@ fun LeafletScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val context = LocalContext.current
     
     // Refresh reminders when screen resumes (coming back from ReminderScreen)
     DisposableEffect(lifecycleOwner) {
@@ -118,6 +128,17 @@ fun LeafletScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+    
+    // Handle events (Toasts)
+    LaunchedEffect(viewModel.events) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is LeafletEvent.ShowToast -> {
+                     android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
     
@@ -196,7 +217,7 @@ fun LeafletScreen(
             else -> {
                 LeafletContent(
                     medication = uiState.medication,
-                    sections = uiState.sections,
+                    parsedLeaflet = uiState.parsedLeaflet,
                     myDosages = uiState.myDosages,
                     savedMedicationId = uiState.savedMedicationId,
                     onManageReminders = {
@@ -207,6 +228,8 @@ fun LeafletScreen(
                             )
                         }
                     },
+                    onRetry = { viewModel.retry() },
+                    isAiProcessing = uiState.isAiProcessing,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
@@ -220,12 +243,15 @@ fun LeafletScreen(
 @Composable
 private fun LeafletContent(
     medication: Medication?,
-    sections: List<LeafletSection>,
+    parsedLeaflet: ParsedLeaflet?,
     myDosages: List<Reminder>,
     savedMedicationId: String?,
     onManageReminders: () -> Unit,
+    onRetry: () -> Unit,
+    isAiProcessing: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val sections = parsedLeaflet?.sections ?: emptyList()
     // State for reading mode
     var isReadingMode by remember { mutableStateOf(false) }
     var selectedSectionIndex by remember { mutableStateOf(0) }
@@ -238,6 +264,46 @@ private fun LeafletContent(
         modifier = modifier.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // AI Processing Indicator
+        AnimatedVisibility(
+            visible = isAiProcessing,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp), 
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Mejorando formato con IA...", 
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+        }
+
+        // AI Summary Card (Quick Job result)
+        // Only show if we have a summary object
+        if (parsedLeaflet?.summary != null) {
+            StructuredSummaryCard(
+                summary = parsedLeaflet.summary,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
         // My dosages section (if saved)
         if (savedMedicationId != null) {
             MyDosageSection(
@@ -253,6 +319,45 @@ private fun LeafletContent(
                 medication = it,
                 modifier = Modifier.fillMaxWidth()
             )
+            
+            // If medication is imported (dummy registration number), show option to fetch official data
+            if (it.registrationNumber == "00000") {
+                OutlinedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.outlinedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Datos oficiales no disponibles",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            "Este medicamento fue importado manualmente. Pulsa aquí para intentar descargar el prospecto y generar el resumen con IA.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        Button(
+                            onClick = onRetry,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Descargar Datos Oficiales")
+                        }
+                    }
+                }
+            }
         }
         
         // Single card to open reading mode
@@ -370,7 +475,7 @@ private fun LeafletContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     itemsIndexed(sections) { index, section ->
-                        SectionCard(
+                        ParsedSectionCard(
                             sectionNumber = index + 1,
                             section = section,
                             modifier = Modifier.fillMaxWidth()
@@ -391,99 +496,10 @@ private fun cleanSectionTitle(title: String): String {
     return title.replace(Regex("^\\d+\\.?\\d*\\.?\\s*"), "").trim()
 }
 
-/**
- * Parses HTML content and cleans up formatting:
- * - Converts HTML to plain text
- * - Removes multiple consecutive blank lines
- * - Trims leading/trailing whitespace
- */
-private fun cleanHtmlContent(html: String): String {
-    // Parse HTML to plain text
-    val rawText = Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT).toString()
-    
-    // Replace multiple newlines (2 or more) with just one newline
-    // Also handles cases with whitespace between newlines
-    return rawText
-        .replace(Regex("(\\n\\s*){2,}"), "\n\n") // Max 2 newlines (one empty line)
-        .replace(Regex("^\\s+"), "") // Trim leading whitespace
-        .replace(Regex("\\s+$"), "") // Trim trailing whitespace
-}
+// Removed cleanHtmlContent helper
 
-/**
- * Parses HTML content to AnnotatedString preserving formatting:
- * - Bold (<b>, <strong>) 
- * - Italic (<i>, <em>)
- * - Lists (<ul>, <ol>, <li>) with bullet points
- * - Removes multiple blank lines
- */
-@Composable
-private fun parseHtmlToAnnotatedString(html: String): AnnotatedString {
-    return buildAnnotatedString {
-        // Pre-process HTML:
-        // 1. Convert <li> tags to bullet points
-        // 2. Add newlines for block elements
-        var processedHtml = html
-            // Handle list items - add bullet point before each item
-            .replace(Regex("<li[^>]*>", RegexOption.IGNORE_CASE), "• ")
-            .replace(Regex("</li>", RegexOption.IGNORE_CASE), "\n")
-            // Handle list containers
-            .replace(Regex("<ul[^>]*>", RegexOption.IGNORE_CASE), "\n")
-            .replace(Regex("</ul>", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("<ol[^>]*>", RegexOption.IGNORE_CASE), "\n")
-            .replace(Regex("</ol>", RegexOption.IGNORE_CASE), "")
-            // Handle paragraphs and breaks
-            .replace(Regex("<p[^>]*>", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("</p>", RegexOption.IGNORE_CASE), "\n\n")
-            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
-        
-        // Parse using Android's Html parser to get Spanned (preserves bold/italic spans)
-        val spanned = Html.fromHtml(processedHtml, Html.FROM_HTML_MODE_COMPACT)
-        
-        // Convert Spanned to AnnotatedString
-        append(spanned.toString())
-        
-        // Apply spans from the Spanned object
-        spanned.getSpans(0, spanned.length, Any::class.java).forEach { span ->
-            val start = spanned.getSpanStart(span)
-            val end = spanned.getSpanEnd(span)
-            
-            when (span) {
-                is android.text.style.StyleSpan -> {
-                    when (span.style) {
-                        android.graphics.Typeface.BOLD -> {
-                            addStyle(SpanStyle(fontWeight = FontWeight.Bold), start, end)
-                        }
-                        android.graphics.Typeface.ITALIC -> {
-                            addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
-                        }
-                        android.graphics.Typeface.BOLD_ITALIC -> {
-                            addStyle(SpanStyle(fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic), start, end)
-                        }
-                    }
-                }
-            }
-        }
-    }.let { annotatedString ->
-        // Clean up multiple blank lines
-        val cleanedText = annotatedString.text
-            .replace(Regex("(\\n\\s*){3,}"), "\n\n")
-            .replace(Regex("^\\s+"), "")
-            .replace(Regex("\\s+$"), "")
-        
-        // Rebuild with cleaned text but preserve styles (approximate - styles may shift slightly)
-        buildAnnotatedString {
-            append(cleanedText)
-            // Re-apply styles to cleaned positions (best effort)
-            annotatedString.spanStyles.forEach { span ->
-                val adjustedStart = minOf(span.start, cleanedText.length)
-                val adjustedEnd = minOf(span.end, cleanedText.length)
-                if (adjustedStart < adjustedEnd) {
-                    addStyle(span.item, adjustedStart, adjustedEnd)
-                }
-            }
-        }
-    }
-}
+
+// Removed parseHtmlToAnnotatedString helper
 
 
 /**
@@ -492,7 +508,7 @@ private fun parseHtmlToAnnotatedString(html: String): AnnotatedString {
 private fun shareLeafletAsPdf(
     context: Context,
     medication: Medication,
-    sections: List<LeafletSection>
+    sections: List<ParsedSection>
 ) {
     try {
         val pdfDocument = PdfDocument()
@@ -549,7 +565,17 @@ private fun shareLeafletAsPdf(
         // Sections
         for ((index, section) in sections.withIndex()) {
             val sectionTitle = "${index + 1}. ${cleanSectionTitle(section.title)}"
-            val sectionContent = cleanHtmlContent(section.content)
+            // Convert content blocks to plain text for PDF
+            val sectionContent = section.content.joinToString("\n\n") { block ->
+                when(block) {
+                    is ContentBlock.Paragraph -> block.text
+                    is ContentBlock.Bold -> block.text
+                    is ContentBlock.Italic -> block.text
+                    is ContentBlock.BulletItem -> "• ${block.text}"
+                    is ContentBlock.NumberedItem -> "${block.number}. ${block.text}"
+                    is ContentBlock.SubHeading -> "\n${block.text.uppercase()}"
+                }
+            }
             
             // Check if we need a new page (rough estimate)
             val estimatedHeight = sectionSpacing + 20 + (sectionContent.length / 80 * lineHeight)
@@ -722,7 +748,7 @@ private fun ReadLeafletCard(
 
 @Composable
 private fun ReadingSectionSelector(
-    sections: List<LeafletSection>,
+    sections: List<ParsedSection>,
     currentIndex: Int,
     onSectionSelected: (Int) -> Unit
 ) {
@@ -987,66 +1013,7 @@ private fun WarningBadge(
     }
 }
 
-@Composable
-private fun SectionCard(
-    sectionNumber: Int,
-    section: LeafletSection,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            // Section header with number badge
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = sectionNumber.toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                Text(
-                    text = section.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Parse HTML content preserving bold, italic and lists
-            val styledText = parseHtmlToAnnotatedString(section.content)
-            
-            Text(
-                text = styledText,
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.4f
-            )
-        }
-    }
-}
+
 
 @Composable
 private fun LoadingState(
@@ -1239,6 +1206,144 @@ private fun MyDosageSection(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun StructuredSummaryCard(
+    summary: LeafletSummary,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(true) }
+    
+    Card(
+        modifier = modifier.padding(bottom = 16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiaryContainer)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(16.dp)
+        ) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiary,
+                        shape = CircleShape,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onTertiary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Resumen Rápido",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+                
+                Surface(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                    shape = CircleShape,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (expanded) "Contraer" else "Expandir",
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+            
+            // Content
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column(modifier = Modifier.padding(top = 16.dp)) {
+                    SummaryItem(
+                        icon = Icons.Default.Info, 
+                        title = "Para qué es", 
+                        text = summary.indications,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    SummaryItem(
+                        icon = Icons.Default.MedicalServices, 
+                        title = "Cómo tomarlo", 
+                        text = summary.dosage,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    SummaryItem(
+                        icon = Icons.Default.Warning, 
+                        title = "Precaución", 
+                        text = summary.warnings,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    text: String,
+    color: Color
+) {
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(20.dp).padding(top = 2.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
+            )
         }
     }
 }

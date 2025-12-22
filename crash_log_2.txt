@@ -1,0 +1,202 @@
+--------- beginning of main
+12-22 18:57:54.537  5381  6459 I bt_shim_scanner: [le_scanning_manager.cc:188] RegisterScanner: in shim layer
+12-22 18:57:54.539  2278  2910 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+12-22 18:57:54.539  3543  6824 E OGuardManager:  mMainHandler is null.
+12-22 18:57:54.539  5381  6407 I AppScanStats: BLE_SCAN_STATE_CHANGED[1]reportBleScanStarted=false
+12-22 18:57:54.540  3543  4486 E OGuardManager:  mMainHandler is null.
+12-22 18:57:54.541  5381  6485 I oplus_bt_dual_sync: [oplus_bt_dual_sync.cc:145] stack_down_sync_action: type=29, len=15
+12-22 18:57:54.544  5381  6485 I bt_shim_scanner: [le_scanning_manager.cc:298] ScanFilterEnable: in shim layer
+12-22 18:57:54.544  3543  4654 D BluetoothA2dp: isA2dpPlaying(null)
+12-22 18:57:54.544  5381  6485 I bt_shim_scanner: [le_scanning_manager.cc:274] ScanFilterAdd: in shim layer
+12-22 18:57:54.544  1964  2068 D vendor.qti.bluetooth@1.0-ibs_handler: SerialClockVote: vote for UART CLK ON
+12-22 18:57:54.545  1858  1910 E TetherController: property_get sys.radio.data.modem_share_flag return 0, 1!
+12-22 18:57:54.546  1964  2068 D vendor.qti.bluetooth@1.0-wake_lock: Acquire wakelock is acquired 
+12-22 18:57:54.546  1964  2068 I vendor.qti.bluetooth@1.0-ibs_handler: DeviceWakeUp: Writing IBS_WAKE_IND
+12-22 18:57:54.547  5381  6485 I bt_shim_scanner: [le_scanning_manager.cc:236] ScanFilterParamSetup: in shim layer, clientIf=1
+12-22 18:57:54.547  1964  6370 I vendor.qti.bluetooth@1.0-ibs_handler: ProcessIbsCmd: Received IBS_WAKE_ACK: 0xFC
+12-22 18:57:54.547  1964  6370 I vendor.qti.bluetooth@1.0-ibs_handler: ProcessIbsCmd: Signal wack_cond_
+12-22 18:57:54.547  1964  2068 D vendor.qti.bluetooth@1.0-ibs_handler: DeviceWakeUp: Unblocked from waiting for FC, pthread_cond_timedwait ret = 0
+12-22 18:57:54.548  5381  5381 I OplusCustomScanStrategy: msg.what = 6
+12-22 18:57:54.548  5381  6485 W IScanClientWrapper: enter default getPassiveSettings!
+12-22 18:57:54.548  1964  6370 I vendor.qti.bluetooth@1.0-ibs_handler: ProcessIbsCmd: Received IBS_WAKE_IND: 0xFD
+12-22 18:57:54.548  1964  6370 I vendor.qti.bluetooth@1.0-ibs_handler: ProcessIbsCmd: Writing IBS_WAKE_ACK
+12-22 18:57:54.552  3543  4486 E OGuardManager:  mMainHandler is null.
+12-22 18:57:54.567  1974  9873 I sensors-hal: handle_sns_std_sensor_event:130, oplus_ambient_light_rear: ts=143203972093929, lux = 5, raw_adc=0, data_cnt 16327
+12-22 18:57:54.577  3543  4357 D FusionLightNextGen: raw_lux -1.0, raw_cct -1.0, r/g/b/c: 1226.3/669.0/364.9/2149.1, R/G/B: 14.0/11.0/24.0, bri 978.0, lux: 37.174622, cct: 5300.0, ir: 0.025468, conf: 2, cnt: 0
+--------- beginning of system
+12-22 18:57:54.578  3543  3719 D OplusBrightnessPhoneStateManager: LuxEvent{event:MAIN_LUX lux:32.0} -> LuxEvent{event:MAIN_LUX lux:32.0}
+12-22 18:57:54.578  3543  3719 W OplusBrightnessAmbientAdapter[LuxQueueProcess]: screen on past time is too short, not to get trend list! checkTime = 1200
+12-22 18:57:54.580  2278  2910 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+12-22 18:57:54.591  1964  6370 I vendor.qti.bluetooth@1.0-ibs_handler: ProcessIbsCmd: Received IBS_SLEEP_IND: 0xFE
+12-22 18:57:54.596  2013  2478 I SDM     : DisplayBuiltIn::IdlePowerCollapse: IPC received, disabling partial update for one frame
+12-22 18:57:54.638  3543  4624 D ScorerUtils: isLowTraffic: txTputKBps=0, rxTputKBps=0
+12-22 18:57:54.639  3543  4624 D OplusWifiPower_TriggerCenter: mComponentCallback: wifistat
+12-22 18:57:54.639  5144  5511 I TcpSyn  : updateFrontUidsToKernel, uids = [10237]
+12-22 18:57:54.642  4767  4817 W OPLUS_LOG_LOAD: ==LOGS PROG INFO, prog(com.android.systemui) ==
+12-22 18:57:54.642  4767  4817 D OplusScrollToTopManager: NotificationShade,This com.android.systemui.shade.NotificationShadeWindowView{4380fe8 I.E...... ......ID 0,0-1264,2780 #7f0a0720 app:id/legacy_window_root alpha=1.0 viewInfo = } change focus to false
+12-22 18:57:54.660 26204 26225 D PowerStatsService: handleMessage:1(h_scrn) 4
+12-22 18:57:54.660 26204 26225 D PowerStatsService: handleMessage systemStatus:{ srft:143200720,srnt:143203067,isrn:true,cbl:35,pbl:38 }
+12-22 18:57:54.660 26204 26225 D MpssActivityMonitor: onScreenOn
+12-22 18:57:54.660 26204 26225 D MpssActivityMonitor: notifyStopMonitorScreenOn
+12-22 18:57:54.660 26204 26225 D MpssActivityMonitor: send srn
+12-22 18:57:54.660  5168  5815 I ModemAci: [Main] register power monitor messenger!
+12-22 18:57:54.660  5168  5483 E ModemAci: [Main] failed to exit scene:LS due to not running!
+12-22 18:57:54.668  5068  5559 D AutoDualCardRoamingDemand: judgeToShowDialog return for sim count != 2
+12-22 18:57:54.673 26204 26225 I STANDBY_NETLINK: send uint32 message to family_id=47, cmd_id=1, attribute_count=2
+12-22 18:57:54.673 26204 26225 I STANDBY_NETLINK: Attribute 0: ID=2, Value=1
+12-22 18:57:54.673 26204 26225 I STANDBY_NETLINK: Attribute 1: ID=1, Value=0
+12-22 18:57:54.673 26204 26225 I STANDBY_NETLINK: buflen = 36
+12-22 18:57:54.673 26204 26225 I STANDBY_NETLINK: attr 0: type=2, value=1, offset=20
+12-22 18:57:54.673 26204 26225 I STANDBY_NETLINK: attr 1: type=1, value=0, offset=28
+12-22 18:57:54.673 26204 26225 I STANDBY_NETLINK: send multi uint32 message:
+12-22 18:57:54.673 26204 26225 I STANDBY_NETLINK:   family_id: 47, cmd: 1, version: 1
+12-22 18:57:54.673 26204 26225 I STANDBY_NETLINK:   attr count: 2
+12-22 18:57:54.673 26204 26225 D PowerStatsService: screenoffDur:2347 ms, too short
+12-22 18:57:54.673 26204 26225 D PowerStatsService: stopMonitor...
+12-22 18:57:54.673 26204 26225 D TrafficMonitor3: stopMonitor
+12-22 18:57:54.673 26204 26225 D TrafficMonitor3: clear all
+12-22 18:57:54.674 26204 26225 D SettingsMonitor: stopMonitor
+12-22 18:57:54.674 26204 26225 D SettingsMonitor: have stop
+12-22 18:57:54.674 26204 26225 D PowerStatsService: scheduleFinishSelf 60000
+12-22 18:57:54.705  4994  5024 D OplusScrollToTopManager: com.android.launcher/com.android.launcher.Launcher,This com.android.internal.policy.DecorView{feb7be3 V.E...... R....... 0,0-1264,2780 aid=0 alpha=1.0 viewInfo = }[Launcher] change focus to true
+12-22 18:57:54.722  3543  3721 D VRR [OPlusSAManager]: updateAutoMinfps for 4630947008615494291 with nits: 70.24115, mHistOK true, mAmbientOK true, mCctOK true, mIrOK true, mBrightnessOK true, isPkgOK true, SA min fps: 119
+12-22 18:57:54.722  2278  2910 I VRR-[OPlusRefreshRateSelector]: updateAutoMode success, display 0, mode 0, fakeframe 1, min fps: 1
+12-22 18:57:54.722  2013  4431 I SDM     : DisplayBuiltIn::SetQSyncMode: VRR + update qsync mode 0 minfps 00C08181
+12-22 18:57:54.729  2013  2384 E SDM     : DRMConnector::Perform: Connector 68: Setting Qsync min fps 12616065
+12-22 18:57:54.731  1344  9828 I OmapiTransport: Session Timer expired !!
+12-22 18:57:54.732  2112  2112 I android.hardware.secure_element-service.qti: closeChannel channel number: 1
+12-22 18:57:54.732  2112  2112 D GPQeSE-HAL: getAtrVendorID vendorId is : 33
+12-22 18:57:54.732  2112  2112 I DMABUFHEAPS: Using DMA-BUF heap named: qcom,qseecom-ta
+12-22 18:57:54.743  2112  5436 E SmcInvoke_MinkDescriptor: mem obj with id :15 not found in list
+12-22 18:57:54.746  2112  2112 D android.hardware.secure_element-service.qti: TimedRetryForwarder_release:79 delete me:12970367433662725248
+12-22 18:57:54.746  1344  9828 I OmapiTransport: (closeChannel) Channel closed
+12-22 18:57:54.785  1974 13072 I sensors-hal: handle_oplus_wise_rgb_event:189, high_pwm_light:lux 14.6,cct 5300.0,brl/algo/ir 978.0/2.0/11.0,pwm/dc 0.0/0.0,rgbc 1144.584351/621.230652/319.283508/2040.302124,ts 143204188237939,cnt 1584,flag 0
+12-22 18:57:54.786  3543  3719 D OplusBrightnessPhoneStateManager: LuxEvent{event:MAIN_LUX lux:37.0} -> LuxEvent{event:MAIN_LUX lux:37.0}
+12-22 18:57:54.800  1964  6383 I vendor.qti.bluetooth@1.0-ibs_handler: DeviceSleep: TX Awake, Sending SLEEP_IND
+12-22 18:57:54.800  1964  6383 D vendor.qti.bluetooth@1.0-ibs_handler: SerialClockVote: vote for UART CLK OFF
+12-22 18:57:54.804  2013  2478 I SDM     : DisplayBuiltIn::IdlePowerCollapse: IPC received, disabling partial update for one frame
+12-22 18:57:54.822  2239  3538 D AFExtImpl: removeThread() 0xb400007e5560d480, id=21
+12-22 18:57:54.822  2239  3538 D StreamHalAidl: [out|ioHandle:21] standby
+12-22 18:57:54.822  2239  3538 D StreamHalAidl: [out|ioHandle:21] pause
+12-22 18:57:54.822  2239  3538 D StreamHalAidl: [out|ioHandle:21] flush
+12-22 18:57:54.822  1984  3536 I PAL: API: pal_stream_stop: 589: Enter. Stream handle :0xb400007520e23140K
+12-22 18:57:54.822  1984  3536 D PAL: Stream: setCachedState: 2612: set cachedState to 6
+12-22 18:57:54.822  1984  3536 D PAL: StreamPCM: stop: 792: Enter. session handle - 0xb400007520f12200K mStreamAttr->direction - 1 state 3
+12-22 18:57:54.822  1984  3536 D PAL: ResourceManager: deregisterDevice: 4908: Enter. dev id: 3
+12-22 18:57:54.822  1984  3536 D PAL: ResourceManager: checkandEnableEC_l: 4800: Enter: setting to enable[OFF] for stream 1.
+12-22 18:57:54.823  1984  3536 D PAL: ResourceManager: checkandEnableECForRXStream_l: 4708: Enter: setting EC[OFF] for usecase 1 of device 3.
+12-22 18:57:54.823  1984  3536 D PAL: ResourceManager: checkandEnableECForRXStream_l: 4774: Exit. status: 0
+12-22 18:57:54.823  1984  3536 D PAL: ResourceManager: checkandEnableEC_l: 4831: Exit. status: 0
+12-22 18:57:54.823  1984  3536 D PAL: ResourceManager: deregisterDevice: 4927: Exit.
+12-22 18:57:54.823  1984  3536 D PAL: SessionAlsaPcm: stop: 2290: Enter
+12-22 18:57:54.823  1984  3536 D PAL: SessionAlsaUtils: signalBtEOS: 2980: backendname MI2S-LPAIF-RX-SECONDARY
+12-22 18:57:54.823  1984  3536 D AGM: graph: graph_stop: 1056 entry graph_handle 0x247534c
+12-22 18:57:54.823  1984  3536 I gsl     : gsl_send_spf_cmd:220 sending pkt opcode 0x1001003 token 0x02259000
+12-22 18:57:54.828  1984  3536 I gsl     : gsl_send_spf_cmd:271 rcvd pkt token : 0x2259000
+12-22 18:57:54.828  1984  3536 D AGM: graph: graph_stop: 1110 exit, ret 0
+12-22 18:57:54.828  1984  3536 I PAL: SessionAlsaUtils: getModuleInstanceId: 1268: tag_id 0xc0000006, MIID is 0x40c4
+12-22 18:57:54.829  1984  3536 I PAL: ResourceManager: voteSleepMonitor: 2374: Unvoting done for nlpi use case, lpi votes 0, nlpi votes : 0
+12-22 18:57:54.829  1984  3536 D PAL: SessionAlsaPcm: stop: 2502: Exit status: 0
+12-22 18:57:54.829  1984  3536 I PAL_OplusSpeakerProtection: stop: 2682: Inside Speaker Protection stop, mDeviceStartCount: 1
+12-22 18:57:54.829  1984  3536 D PAL: Device: stop_l: 744: Enter. deviceCount 1 deviceStartStopCount 1 for device id 3 (PAL_DEVICE_OUT_SPEAKER)
+12-22 18:57:54.829  1984  3536 I PAL_OplusSpeakerProtection: spkrProtProcessingMode: 2484: Closing the VI path
+12-22 18:57:54.829  1984  3536 D AGM: graph: graph_stop: 1056 entry graph_handle 0x147534c
+12-22 18:57:54.829  1984  3536 I gsl     : gsl_send_spf_cmd:220 sending pkt opcode 0x1001003 token 0x0225a000
+12-22 18:57:54.830  1984  3536 I gsl     : gsl_send_spf_cmd:271 rcvd pkt token : 0x225a000
+12-22 18:57:54.830  1984  3536 D AGM: graph: graph_stop: 1110 exit, ret 0
+12-22 18:57:54.830  1984  3536 I AGM: API: agm_session_aif_connect: 623 disconnecting aifid:17 with session id=121
+12-22 18:57:54.830  1984  3536 D AGM: graph: graph_stop: 1056 entry graph_handle 0x147534c
+12-22 18:57:54.830  1984  3536 I gsl     : gsl_send_spf_cmd:220 sending pkt opcode 0x1001004 token 0x0225b000
+12-22 18:57:54.832  1984  3536 I gsl     : gsl_send_spf_cmd:271 rcvd pkt token : 0x225b000
+12-22 18:57:54.832  1984  3536 D AGM: graph: graph_stop: 1110 exit, ret 0
+12-22 18:57:54.832  1984  3536 I AGM: device: device_close: 648 PCM device 17 open refcnt: 1
+12-22 18:57:54.834  1984  3536 I AgmIpc::Server: removeSessionHandle removing handle b400007522493640 for session 121
+12-22 18:57:54.834  1984  3536 D AGM: session: session_close: 1454 enter
+12-22 18:57:54.834  1984  3536 D AGM: graph: graph_close: 874 entry handle 0x147534c
+12-22 18:57:54.834  1984  3536 D AGM: graph: graph_close: 902 exit, ret 0
+12-22 18:57:54.834  1984  3536 D AGM: session: session_close: 1505 exit, ret 0
+12-22 18:57:54.834  1984  3536 I AGM: oplus_agm_fb: clearOpenedSessions: 81 i = 1, clear session_id = 121
+12-22 18:57:54.834  1984  3536 I PAL: ResourceManager: freeFrontEndIds: 8104: stream type 1, freeing 121
+12-22 18:57:54.834  1984  3536 D PAL: memLoggerBuilder: palStateQueueBuilder: 77: TIME IS:1766426274834
+12-22 18:57:54.834  1984  3536 D PAL: StreamPCM: stop: 930: Exit. status 0, state 6
+12-22 18:57:54.834  1984  3536 I PAL: API: pal_stream_stop: 654: Exit. status 0
+12-22 18:57:54.834  1984  3536 I PAL: API: pal_stream_close: 404: Enter. Stream handle :0xb400007520e23140K
+12-22 18:57:54.834  1984  3536 D PAL: Stream: setCachedState: 2612: set cachedState to 0
+12-22 18:57:54.834  1984  3536 D PAL: StreamPCM: close: 381: Enter. session handle - 0xb400007520f12200K device count - 1 state 6
+12-22 18:57:54.834  1984  3536 D PAL: SessionAlsaPcm: close: 2519: Enter
+12-22 18:57:54.834  1984  3536 D PAL: SessionAlsaPcm: close: 2580: backendname MI2S-LPAIF-RX-SECONDARY
+12-22 18:57:54.834  1984  3536 D PAL: SessionAlsaPcm: close: 2589: Rx dev not active
+12-22 18:57:54.834  1984  3536 D PAL: SessionAlsaUtils: getFeMixerControl: 357: mixer control PCM126 control
+12-22 18:57:54.834  1984  3472 D PAL_OplusSpeakerProtection: spMonitorThread: 1845: speaker device is disabled
+12-22 18:57:54.835  1984  3536 I AGM: API: agm_session_aif_connect: 623 disconnecting aifid:16 with session id=126
+12-22 18:57:54.835  1984  3536 D AGM: graph: graph_stop: 1056 entry graph_handle 0x247534c
+12-22 18:57:54.835  1984  3536 I gsl     : gsl_send_spf_cmd:220 sending pkt opcode 0x1001004 token 0x0225c000
+12-22 18:57:54.836  1984  3536 I gsl     : gsl_send_spf_cmd:271 rcvd pkt token : 0x225c000
+12-22 18:57:54.836  1984  3536 D AGM: graph: graph_stop: 1110 exit, ret 0
+12-22 18:57:54.836  1984  3536 I AGM: device: device_close: 648 PCM device 16 open refcnt: 1
+12-22 18:57:54.843  1984  3536 D PAL: SessionAlsaUtils: close: 732: backend MI2S-LPAIF-RX-SECONDARY and freedevicemetadata 1
+12-22 18:57:54.843  1984  3536 I AGM: session: session_obj_set_sess_aif_metadata: 2006 Exit
+12-22 18:57:54.843  1984  3536 D PAL: SessionAlsaPcm: close: 2608: pcm_close pcmLpmRefCnt 1
+12-22 18:57:54.843  1984  3536 D PAL: Session: setPmQosMixerCtl: 158: mixer control disabled for PM_QOS Vote 
+12-22 18:57:54.843  1984  3536 D PAL: SessionAlsaPcm: close: 2616: pcm_close pcmLpmRefCnt 0
+12-22 18:57:54.843  1984  3536 I AgmIpc::Server: removeSessionHandle removing handle b400007522491c00 for session 126
+12-22 18:57:54.843  1984  3536 D AGM: session: session_close: 1454 enter
+12-22 18:57:54.843  1984  3536 D AGM: graph: graph_close: 874 entry handle 0x247534c
+12-22 18:57:54.843  1984  3536 I gsl     : gsl_send_spf_cmd:220 sending pkt opcode 0x1001004 token 0x0225d000
+12-22 18:57:54.845  1984  3536 I gsl     : gsl_send_spf_cmd:271 rcvd pkt token : 0x225d000
+12-22 18:57:54.845  1984  3536 D AGM: graph: graph_close: 902 exit, ret 0
+12-22 18:57:54.845  1984  3536 D AGM: session: session_close: 1505 exit, ret 0
+12-22 18:57:54.845  1984  3536 I AGM: oplus_agm_fb: clearOpenedSessions: 81 i = 2, clear session_id = 126
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: registerMixerEventCallback: 5641: callback found for pcm id 126, remove
+12-22 18:57:54.845  1984  3536 I PAL: ResourceManager: freeFrontEndIds: 8104: stream type 1, freeing 126
+12-22 18:57:54.845  1984  3536 D PAL: SessionAlsaPcm: close: 2759: Exit status: 0
+12-22 18:57:54.845  1984  3536 I PAL: Device: close: 619: Enter. deviceCount 1 for device id 3 (PAL_DEVICE_OUT_SPEAKER)
+12-22 18:57:54.845  1984  3536 D PAL: Device: close: 624: Disabling device 3 with snd dev speaker
+12-22 18:57:54.845  1984  3536 I PAL: Device: close: 643: Exit. deviceCount 0 for device id 3 (PAL_DEVICE_OUT_SPEAKER), exit status 0
+12-22 18:57:54.845  1984  3536 D PAL: Speaker: close: 153: Concurrent State unchanged, ignore notifying
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: checkAndSetDutyCycleParam: 7421: duty cycle for UPD not enabled
+12-22 18:57:54.845  1984  3536 D PAL: memLoggerBuilder: palStateQueueBuilder: 77: TIME IS:1766426274845
+12-22 18:57:54.845  1984  3536 D PAL: StreamPCM: close: 425: Exit. closed the stream successfully 0 status 0
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: deactivateStreamUserCounter: 4237: stream 0xb400007520e23140 is to be deactivated.
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: deactivateStreamUserCounter: 4241: stream 0xb400007520e23140 is inactive.
+12-22 18:57:54.845  1984  3536 I PAL_OplusPalFb: oplus_feedback_delete_info: 922: delete info i = 1, stream 0xb400007520e23140K
+12-22 18:57:54.845  1984  3536 D PAL: API: notify_concurrent_stream: 110: Notify concurrent stream: 0xb400007520e23140K, active 0
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: eraseStreamUserCounter: 4258: stream counter for 0xb400007520e23140 is erased.
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: deregisterStream: 3960: Enter. stream 0xb400007520e23140K
+12-22 18:57:54.845  1984  3536 I PAL: ResourceManager: deregisterStream: 3968: stream type 1
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: deregisterStream: 4133: Exit. ret 0
+12-22 18:57:54.845  1984  3536 D PAL: Device: removeStreamDeviceAttr: 1046: found entry for stream:1
+12-22 18:57:54.845  1984  3536 D PAL: Device: removeStreamDeviceAttr: 1055: dev: 3 attr removed are: priority: 0x3, stream type: 1, ch: 2, sr: 48000, bit_width: 24, fmt: 22, sndDev: speaker, custom_key: 
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: restoreDevice: 14979: Enter
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: restoreDevice: 15009: current device: 3 running at, ch 2, sr 48000, bit_width 24, fmt 22, sndDev speaker
+12-22 18:57:54.845  1984  3536 E PAL: Device: clearStreamDevAttrCustomKey: 1143: empty device attr for device 3
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: getSharedBEActiveStreamDevs: 8282: got dev 3 active streams on dev is 0
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: restoreDevice: 15090: no active device, switch un-needed
+12-22 18:57:54.845  1984  3536 D PAL: ResourceManager: restoreDevice: 15098: Exit
+12-22 18:57:54.845  1984  3536 I PAL: API: pal_stream_close: 458: Exit. status 0
+12-22 18:57:54.845  1984  3536 D AHAL_StreamOut_QTI: standby : usecase: LOW_LATENCY_PLAYBACK IoHandle: 21 
+12-22 18:57:54.846  3543  5062 E OGuardManager:  mMainHandler is null.
+12-22 18:57:54.951  1964  5685 D vendor.qti.bluetooth@1.0-wake_lock: Release wakelock is released 
+12-22 18:57:54.995  3543  3719 D OplusBrightnessPhoneStateManager: LuxEvent{event:MAIN_LUX lux:37.0} -> LuxEvent{event:MAIN_LUX lux:37.0}
+12-22 18:57:55.156  3543  3721 D VRR [OPlusExternalRefreshRateManager]: notifyDisableOtiMode: false
+12-22 18:57:55.156  3543  3721 D VRR [OPlusSurfaceFlingerController]:  setTouchIdleShouldPause : false
+12-22 18:57:55.156  2278  2884 D VRR [OTI]: handleIdle from 0 to 0
+12-22 18:57:55.156  2278  2884 D VRR [OTI-HW]: isStateReady 0
+12-22 18:57:55.156  2278  2884 D VRR [OTI-HW]: keep rate.
+12-22 18:57:55.200  3543  4357 I CwbClient: setCWBDisplayType set mFeatureID = CWB_RGB_VALUE
+12-22 18:57:55.202  3543  3719 D OplusBrightnessPhoneStateManager: LuxEvent{event:MAIN_LUX lux:37.0} -> LuxEvent{event:MAIN_LUX lux:37.0}
+12-22 18:57:55.293  2013  2478 I SDM     : DisplayBuiltIn::IdlePowerCollapse: IPC received, disabling partial update for one frame
+12-22 18:57:55.408  7976  9998 W adbd    : timed out while waiting for FUNCTIONFS_BIND, trying again
+12-22 18:57:55.408  7976  9998 I adbd    : UsbFfs: connection terminated: monitor thread finished
+12-22 18:57:55.409  1974  9921 I sensors-hal: handle_oplus_wise_rgb_event:161, wise_rgb: (1587)(cct, lux, ir)[5300.00, 14.92, 9.913946] (r, g, b, c)[1171.84, 645.12, 319.28, 2094.71]                 (pwm, hbm, brl, algo)[0.0 0.0 978.0 2.0], flag 0
+12-22 18:57:55.409  3543  4357 D FusionLightNextGen: raw_lux -1.0, raw_cct -1.0, r/g/b/c: 1171.8/645.1/319.3/2094.7, R/G/B: 15.0/13.0/23.0, bri 978.0, lux: 36.233490, cct: 5300.0, ir: 0.009553, conf: 2, cnt: 0
+12-22 18:57:55.410  3543  3719 D OplusBrightnessPhoneStateManager: LuxEvent{event:MAIN_LUX lux:37.0} -> LuxEvent{event:MAIN_LUX lux:37.0}
+12-22 18:57:55.422  7976  7982 I adbd    : opening control endpoint /dev/usb-ffs/adb/ep0
+12-22 18:57:55.510  3543  3716 D AidlDisplayPanelFeature: getDisplayPanelInfo +++, featureID:251
+12-22 18:57:55.511  2165  2193 I DisplayPanelInterface: GetDisplayBrightnessTime [brightness_time]= [41074.140852767]
+12-22 18:57:55.511  3543  3716 I AidlDisplayPanelFeature: [41074.140852767]
+12-22 18:57:55.511  3543  3716 D AidlDisplayPanelFeature: getDisplayPanelInfo ---, result = [41074.140852767]
+12-22 18:57:55.647  3543  4623 D OplusWifiPowerWakeupStats: IPV4_TCP_Packet wake up count 2
+12-22 18:57:55.648  3543  4623 D OplusWifiPower_WakeupIp: android.uid.shell:2000(192.168.50.***) wakeup host
+12-22 18:57:55.662 26204  1528 D CustomLogManagerService: WorkHandler msg.what :5
+12-22 18:57:55.662 26204  1528 D CustomLogManagerService: user experience toggle off
