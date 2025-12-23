@@ -103,4 +103,7 @@ dependencies {
     
     // Jsoup
     implementation(libs.jsoup)
+    
+    // WebView dark mode
+    implementation(libs.androidx.webkit)
 }

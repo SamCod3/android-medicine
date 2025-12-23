@@ -13,32 +13,32 @@ MediTrack is an Android app for scanning Spanish medication barcodes and managin
 
 **Current Branch:** `feature/ai-integration`
 
-## ✅ Recently Completed (Dec 2024)
+## ✅ Recently Completed (Dec 23, 2024)
 
-### AI Summary System
-- **Contextual Refinement Menu:** "Opciones" button with section-specific modes
-  - Dosage: Focus dosage, For child, For elderly
-  - Side Effects: Serious only, All effects
-  - Interactions: Alcohol, Pregnancy
-  - General: Regenerate, More detail, Simpler
-- **Glassmorphism Progress Indicator:** Animated gradient bar with bounce effect
-- **Markdown Cleanup:** `cleanMarkdown()` post-processing removes residual formatting
-- **Improved Prompts:** Explicit instructions to use ONLY provided content
+### AI Summary Section BottomSheet Improvements
+- **Full-screen BottomSheet:** `skipPartiallyExpanded = true`
+- **Accordion behavior:** Summary hidden when showing WebView
+- **WebView with dynamic height:** Uses `weight(1f)` for full available space
+- **WebView LayoutParams:** MATCH_PARENT for proper sizing
+- **Font size:** Increased to 17px for better readability
 
-### Data Layer
-- **Section Summary Cache:** `SectionSummaryCacheDao` for caching AI summaries
-- **Backup System:** Full JSON export/import with de-duplication
+### Mi Agenda Accordion Redesign
+- **Collapsible sections by time slot:** Headers like "07:50 (2)" are clickable
+- **Auto-expand next slot:** Calculates which time ≥ current time to expand
+- **CollapsibleTimeHeader:** 16dp corners, count badge in blue pill, chevron on right
+- **Blue border:** Highlighted + expanded sections have blue border
+- **12dp spacing:** Between accordion sections
+- **CompactReminderCard:** Truncated medication names, compact layout
 
-## 🔴 NEXT: AI Reformatting
+## 🔴 PENDING: Improve CompactReminderCard
 
-### Proposal: Use Gemini Nano for Content Reformatting
-Current `AILeafletParser` uses two-pass heuristic approach.
-Proposal: Let AI reformat content with simple markers, then parse to ContentBlocks.
+The medication rows inside expanded accordion sections need refinement:
+- Match mockup design more closely
+- Consider removing visible trash icon (swipe gesture instead?)
+- Better visual hierarchy between medication name and dose
+- Cards should feel as polished as the headers
 
-**Benefits:**
-- Better detection of non-standard lists
-- Handles malformed HTML better
-- Uses same chunking strategy as summaries
+Reference mockup: See `agenda_collapsible_*.png` in brain folder
 
 ## Quick Start
 
@@ -69,7 +69,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk && adb shell am start -
 | **Leaflet Parser** | `ai/AILeafletParser.kt` |
 | **Leaflet UI** | `ui/screens/leaflet/LeafletScreen.kt` |
 | **Leaflet VM** | `ui/screens/leaflet/LeafletViewModel.kt` |
+| **Section WebView** | `ui/components/SectionWebView.kt` |
+| **Mi Agenda** | `ui/screens/allreminders/AllRemindersScreen.kt` |
 | **Cache DAO** | `data/local/dao/SectionSummaryCacheDao.kt` |
 
-## Recent Commits
-- `feat(ai): add contextual refinement menu and glassmorphism progress indicator`
+## Recent Work
+- Section BottomSheet: Accordion + WebView full-screen
+- Mi Agenda: Collapsible time sections with auto-expand

@@ -30,7 +30,8 @@ sealed class ContentBlock {
  */
 data class ParsedSection(
     val title: String,
-    val content: List<ContentBlock>
+    val content: List<ContentBlock>,
+    val rawHtml: String = ""  // Original HTML for WebView rendering
 )
 
 /**

@@ -40,7 +40,8 @@ class AILeafletParser(
                 val formattedSections = legacySections.map { section ->
                     ParsedSection(
                         title = section.title,
-                        content = formatWithTwoPasses(section.content)
+                        content = formatWithTwoPasses(section.content),
+                        rawHtml = section.content  // Keep original HTML for WebView
                     )
                 }
                 

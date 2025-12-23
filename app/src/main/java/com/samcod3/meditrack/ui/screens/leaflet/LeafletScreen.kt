@@ -2,10 +2,12 @@ package com.samcod3.meditrack.ui.screens.leaflet
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.text.Html
+import com.samcod3.meditrack.ui.components.SectionWebView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -115,6 +117,7 @@ import com.samcod3.meditrack.domain.model.ContentBlock
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.core.content.FileProvider
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -469,34 +472,106 @@ private fun LeafletContent(
         Spacer(modifier = Modifier.height(80.dp))
     }
     
-    // Section summary BottomSheet
+    // Section summary BottomSheet - Full screen
     if (sectionViewState.sectionIndex >= 0 && sectionViewState.section != null) {
-        val summarySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        val summarySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val scrollState = rememberScrollState()
+        
+        // Calculate dynamic height based on screen
+        val configuration = LocalConfiguration.current
+        val screenHeight = configuration.screenHeightDp.dp
+        val webViewHeight = screenHeight * 0.7f  // 70% of screen height
         
         ModalBottomSheet(
             onDismissRequest = { onClearSelectedSection() },
             sheetState = summarySheetState,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                // Section title
-                Text(
-                    text = "${sectionViewState.sectionIndex + 1}. ${cleanSectionTitle(sectionViewState.section.title)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+            // Use different layout based on content mode
+            if (sectionViewState.showFullContent) {
+                // Full screen WebView layout (no scroll, uses weight)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    // Section title
+                    Text(
+                        text = "${sectionViewState.sectionIndex + 1}. ${cleanSectionTitle(sectionViewState.section.title)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
+                    // Toggle button
+                    Button(
+                        onClick = { onToggleFullContent() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.KeyboardArrowUp,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Ocultar contenido")
+                    }
+                    
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    
+                    // WebView takes remaining space
+                    if (sectionViewState.section.rawHtml.isNotBlank()) {
+                        SectionWebView(
+                            html = sectionViewState.section.rawHtml,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)  // Takes all remaining space
+                        )
+                    } else {
+                        // Fallback
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(scrollState)
+                        ) {
+                            sectionViewState.section.content.forEach { block ->
+                                RenderContentBlockInSheet(block)
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Summary layout (scrollable)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    // Section title
+                    Text(
+                        text = "${sectionViewState.sectionIndex + 1}. ${cleanSectionTitle(sectionViewState.section.title)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 
                 Spacer(Modifier.height(16.dp))
                 
-                // AI Summary Loading - Glassmorphism style
-                if (sectionViewState.isLoadingSummary) {
+                // AI Summary section - hidden when showing full content (accordion behavior)
+                AnimatedVisibility(
+                    visible = !sectionViewState.showFullContent,
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Column {
+                        // AI Summary Loading - Glassmorphism style
+                        if (sectionViewState.isLoadingSummary) {
                     // Infinite animation for progress bar
                     val infiniteTransition = rememberInfiniteTransition(label = "progress")
                     val progressOffset by infiniteTransition.animateFloat(
@@ -756,47 +831,29 @@ private fun LeafletContent(
                         }
                     }
                 }
+                    }  // End Column inside AnimatedVisibility
+                }  // End AnimatedVisibility for summary
                 
                 Spacer(Modifier.height(16.dp))
                 
-                // Toggle full content button
+                // Toggle full content button (only in summary mode)
                 Button(
                     onClick = { onToggleFullContent() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
-                        imageVector = if (sectionViewState.showFullContent) 
-                            Icons.Default.KeyboardArrowUp else Icons.AutoMirrored.Filled.MenuBook,
+                        Icons.AutoMirrored.Filled.MenuBook,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (sectionViewState.showFullContent) "Ocultar contenido" else "Leer sección completa"
-                    )
-                }
-                
-                // Full content (if expanded)
-                AnimatedVisibility(
-                    visible = sectionViewState.showFullContent,
-                    enter = expandVertically(),
-                    exit = shrinkVertically()
-                ) {
-                    Column(modifier = Modifier.padding(top = 16.dp)) {
-                        HorizontalDivider()
-                        Spacer(Modifier.height(16.dp))
-                        
-                        // Render content blocks
-                        sectionViewState.section.content.forEach { block ->
-                            RenderContentBlockInSheet(block)
-                            Spacer(Modifier.height(8.dp))
-                        }
-                    }
+                    Text("Leer sección completa")
                 }
                 
                 Spacer(Modifier.height(32.dp))
-            }
-        }
+                }  // End else Column
+            }  // End if/else
+        }  // End ModalBottomSheet
     }
     
     // Reading mode BottomSheet (read all sections)

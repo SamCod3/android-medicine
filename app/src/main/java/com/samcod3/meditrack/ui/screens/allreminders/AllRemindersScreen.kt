@@ -1,5 +1,9 @@
 package com.samcod3.meditrack.ui.screens.allreminders
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Person
@@ -29,21 +35,29 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.samcod3.meditrack.domain.model.Reminder
 import org.koin.androidx.compose.koinViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +73,32 @@ fun AllRemindersScreen(
     val totalReminders by viewModel.totalReminders.collectAsState()
     
     val today = SimpleDateFormat("EEEE, d 'de' MMMM", Locale("es", "ES")).format(Date())
+    
+    // Group reminders by time
+    val groupedByTime = remember(todayReminders) {
+        todayReminders.groupBy { it.timeFormatted }
+    }
+    
+    // Calculate which time slot should be expanded (next upcoming)
+    val currentHourMinute = remember {
+        val cal = java.util.Calendar.getInstance()
+        cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+    }
+    
+    val nextTimeSlot = remember(groupedByTime) {
+        groupedByTime.keys.firstOrNull { timeStr ->
+            val parts = timeStr.split(":")
+            if (parts.size == 2) {
+                val timeMinutes = parts[0].toIntOrNull()?.times(60)?.plus(parts[1].toIntOrNull() ?: 0) ?: 0
+                timeMinutes >= currentHourMinute
+            } else false
+        } ?: groupedByTime.keys.lastOrNull()
+    }
+    
+    // State for expanded sections
+    var expandedSections by remember(nextTimeSlot) { 
+        mutableStateOf(setOf(nextTimeSlot ?: ""))
+    }
     
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -93,7 +133,7 @@ fun AllRemindersScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)  // More separation
             ) {
                 // Header with summary
                 item {
@@ -133,19 +173,37 @@ fun AllRemindersScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 
-                // Group by time
-                val groupedByTime = todayReminders.groupBy { it.timeFormatted }
+                // Collapsible time sections
                 groupedByTime.forEach { (time, reminders) ->
+                    val isExpanded = expandedSections.contains(time)
+                    val isNextSlot = time == nextTimeSlot
+                    
                     item {
-                        TimeHeader(time = time, count = reminders.size)
-                    }
-                    items(reminders, key = { it.id }) { reminder ->
-                        AgendaReminderCard(
-                            reminder = reminder,
-                            onClick = { onReminderClick(reminder.medicationId, reminder.medicationName) },
-                            onToggle = { viewModel.toggleReminder(reminder.id, it) },
-                            onDelete = { viewModel.deleteReminder(reminder.id) }
+                        CollapsibleTimeHeader(
+                            time = time,
+                            count = reminders.size,
+                            isExpanded = isExpanded,
+                            isHighlighted = isNextSlot,
+                            onClick = {
+                                expandedSections = if (isExpanded) {
+                                    expandedSections - time
+                                } else {
+                                    expandedSections + time
+                                }
+                            }
                         )
+                    }
+                    
+                    // Only show items if expanded
+                    if (isExpanded) {
+                        items(reminders, key = { it.id }) { reminder ->
+                            CompactReminderCard(
+                                reminder = reminder,
+                                onClick = { onReminderClick(reminder.medicationId, reminder.medicationName) },
+                                onToggle = { viewModel.toggleReminder(reminder.id, it) },
+                                onDelete = { viewModel.deleteReminder(reminder.id) }
+                            )
+                        }
                     }
                 }
             }
@@ -281,6 +339,170 @@ private fun AgendaReminderCard(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Eliminar",
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Collapsible time header for accordion behavior.
+ */
+@Composable
+private fun CollapsibleTimeHeader(
+    time: String,
+    count: Int,
+    isExpanded: Boolean,
+    isHighlighted: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (isExpanded && isHighlighted) 
+        MaterialTheme.colorScheme.primary 
+    else 
+        androidx.compose.ui.graphics.Color.Transparent
+    
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .then(
+                if (borderColor != androidx.compose.ui.graphics.Color.Transparent)
+                    Modifier.padding(2.dp)
+                else
+                    Modifier
+            ),
+        color = if (isHighlighted) 
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        else 
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(16.dp),
+        border = if (isExpanded && isHighlighted) 
+            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        else
+            null
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = time,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (isHighlighted)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            // Count badge
+            Surface(
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "($count)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = if (isExpanded) 
+                    Icons.Default.KeyboardArrowDown 
+                else 
+                    Icons.Default.KeyboardArrowRight,
+                contentDescription = if (isExpanded) "Colapsar" else "Expandir",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Compact reminder card for accordion content.
+ * More dense layout with truncated medication name.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompactReminderCard(
+    reminder: Reminder,
+    onClick: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (reminder.enabled)
+                MaterialTheme.colorScheme.surface
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Compact pill icon
+            Icon(
+                imageVector = Icons.Default.Medication,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // Medication info - compact
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = reminder.medicationName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${reminder.dosageFormatted} · ${reminder.scheduleFormatted}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            // Compact switch
+            Switch(
+                checked = reminder.enabled,
+                onCheckedChange = onToggle,
+                modifier = Modifier.height(24.dp),
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+            
+            // Subtle delete icon
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Eliminar",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
