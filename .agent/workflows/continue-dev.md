@@ -13,29 +13,32 @@ MediTrack is an Android app for scanning Spanish medication barcodes and managin
 
 **Current Branch:** `feature/ai-integration`
 
-## ✅ AI Integration & Import/Export COMPLETE
-- **Search:** Gemini Nano OCR & Smart Filters (Integrated)
-- **Leaflet:** AI Summaries & Structured Parsing (Integrated)
-- **Data Management:** 
-    - Full JSON Backup & Restore (Implemented)
-    - "Smart Save" de-duplication logic (Implemented)
-    - PDF Import removed (Simplified UI)
+## ✅ Recently Completed (Dec 2024)
 
-## 🔴 NEXT TASKS: Refinement & Testing
+### AI Summary System
+- **Contextual Refinement Menu:** "Opciones" button with section-specific modes
+  - Dosage: Focus dosage, For child, For elderly
+  - Side Effects: Serious only, All effects
+  - Interactions: Alcohol, Pregnancy
+  - General: Regenerate, More detail, Simpler
+- **Glassmorphism Progress Indicator:** Animated gradient bar with bounce effect
+- **Markdown Cleanup:** `cleanMarkdown()` post-processing removes residual formatting
+- **Improved Prompts:** Explicit instructions to use ONLY provided content
 
-### High Priority
-1. **Medication Details Screen** - Apply AI to:
-   - Summarize key drug information
-   - Extract warnings/contraindications
-   - Provide quick patient-friendly explanations
+### Data Layer
+- **Section Summary Cache:** `SectionSummaryCacheDao` for caching AI summaries
+- **Backup System:** Full JSON export/import with de-duplication
 
-2. **Prospectus/Leaflet Screen** - Refinement:
-   - Answer user questions about the medication
-   - Highlight important warnings
-   
-### Implementation Notes
-- Reuse `HybridAIService` for AI access
-- Leverage `BackupUseCase` for any data migration needs
+## 🔴 NEXT: AI Reformatting
+
+### Proposal: Use Gemini Nano for Content Reformatting
+Current `AILeafletParser` uses two-pass heuristic approach.
+Proposal: Let AI reformat content with simple markers, then parse to ContentBlocks.
+
+**Benefits:**
+- Better detection of non-standard lists
+- Handles malformed HTML better
+- Uses same chunking strategy as summaries
 
 ## Quick Start
 
@@ -43,7 +46,7 @@ MediTrack is an Android app for scanning Spanish medication barcodes and managin
 
 1. Check current git status and branch
 ```bash
-git status && git log --oneline -5
+git status && git log --oneline -3
 ```
 
 2. Build to verify everything works
@@ -51,29 +54,22 @@ git status && git log --oneline -5
 ./gradlew assembleDebug
 ```
 
-3. Review task.md for pending items
+3. Install and test
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk && adb shell am start -n com.samcod3.meditrack/.MainActivity
+```
 
 ## Key Files
 
 | Area | File |
 |------|------|
+| **AI Summaries** | `domain/usecase/SectionSummaryUseCase.kt` |
+| **Refinement Modes** | `domain/model/RefinementMode.kt` |
 | **AI Services** | `ai/GeminiNanoService.kt`, `ai/HybridAIService.kt` |
-| **AI Status** | `ai/AIStatusChecker.kt` |
-| **Tool Actions** | `ai/AIService.kt` (ToolAction sealed class) |
-| Scanner | `ui/screens/scanner/ScannerScreen.kt` |
-| Search | `ui/screens/search/SearchScreen.kt` |
-| **Details** | `ui/screens/details/MedicationDetailScreen.kt` |
-| **Leaflet** | `ui/screens/leaflet/LeafletScreen.kt` |
-| API | `data/remote/api/CimaApiService.kt` |
+| **Leaflet Parser** | `ai/AILeafletParser.kt` |
+| **Leaflet UI** | `ui/screens/leaflet/LeafletScreen.kt` |
+| **Leaflet VM** | `ui/screens/leaflet/LeafletViewModel.kt` |
+| **Cache DAO** | `data/local/dao/SectionSummaryCacheDao.kt` |
 
-## Common Tasks
-
-### Add AI to a new screen
-1. Inject `AIService` via Koin in `AppModule.kt`
-2. Call `aiService.processXxx()` methods
-3. Handle `ToolAction` results with `when` statement
-
-### Test on device
-```bash
-./gradlew installDebug && adb shell am start -n com.samcod3.meditrack/.MainActivity
-```
+## Recent Commits
+- `feat(ai): add contextual refinement menu and glassmorphism progress indicator`
