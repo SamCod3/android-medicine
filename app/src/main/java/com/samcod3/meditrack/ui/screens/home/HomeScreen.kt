@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +52,7 @@ fun HomeScreen(
     onMedicationClick: (String) -> Unit,
     onReminderClick: (medicationId: String, medicationName: String) -> Unit,
     onChangeProfile: () -> Unit,
+    onSettingsClick: () -> Unit,
     viewModel: HomeViewModel = koinViewModel { parametersOf(profileId) }
 ) {
     val medications by viewModel.medications.collectAsState()
@@ -68,6 +70,9 @@ fun HomeScreen(
                 }
             },
             actions = {
+                IconButton(onClick = onSettingsClick) {
+                    Icon(Icons.Default.Settings, contentDescription = "Ajustes")
+                }
                 IconButton(onClick = onChangeProfile) {
                     Icon(Icons.Default.Person, contentDescription = "Cambiar perfil")
                 }

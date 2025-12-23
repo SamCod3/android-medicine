@@ -69,6 +69,14 @@ class FallbackOcrService : AIService {
     override fun isAvailable(): Boolean = true // Always available as fallback
     
     /**
+     * Fallback cannot generate text responses, requires Gemini Nano.
+     */
+    override suspend fun generateTextResponse(prompt: String): String? {
+        Log.d(TAG, "generateTextResponse not supported in fallback")
+        return null
+    }
+    
+    /**
      * Cleans up OCR text for medication name search.
      * - Takes the first meaningful line (likely the medication name)
      * - Removes special characters but keeps accents

@@ -106,5 +106,25 @@ interface AIService {
      */
     suspend fun parseTreatmentText(text: String): List<ParsedMedication>
     
+    /**
+     * Generate a text response from a prompt.
+     * Used for summarization and other text generation tasks.
+     * @param prompt The prompt to send to the AI
+     * @return Generated text response, or null if failed
+     */
+    suspend fun generateTextResponse(prompt: String): String?
+    
+    /**
+     * Generate a text response with progress callback.
+     * Notifies when retrying so UI can show state.
+     * @param prompt The prompt to send to the AI
+     * @param onRetry Called when a retry is about to happen (attempt number, max retries)
+     * @return Generated text response, or null if failed
+     */
+    suspend fun generateTextResponseWithProgress(
+        prompt: String,
+        onRetry: (attempt: Int, maxRetries: Int) -> Unit
+    ): String? = generateTextResponse(prompt) // Default implementation ignores callback
+    
     fun isAvailable(): Boolean
 }

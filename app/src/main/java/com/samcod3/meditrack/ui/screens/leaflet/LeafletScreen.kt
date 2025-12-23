@@ -7,6 +7,12 @@ import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.text.Html
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
@@ -17,9 +23,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -29,26 +37,35 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -60,6 +77,7 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -75,6 +93,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -84,6 +103,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.samcod3.meditrack.R
 import com.samcod3.meditrack.domain.model.LeafletSection
@@ -230,6 +250,12 @@ fun LeafletScreen(
                     },
                     onRetry = { viewModel.retry() },
                     isAiProcessing = uiState.isAiProcessing,
+                    // Section summary callbacks
+                    sectionViewState = uiState.sectionViewState,
+                    onSelectSection = { viewModel.selectSection(it) },
+                    onClearSelectedSection = { viewModel.clearSelectedSection() },
+                    onToggleFullContent = { viewModel.toggleFullContent() },
+                    onRefineSummary = { mode -> viewModel.refineSummary(mode) },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
@@ -249,10 +275,16 @@ private fun LeafletContent(
     onManageReminders: () -> Unit,
     onRetry: () -> Unit,
     isAiProcessing: Boolean,
+    // Section summary state and callbacks
+    sectionViewState: SectionViewState,
+    onSelectSection: (Int) -> Unit,
+    onClearSelectedSection: () -> Unit,
+    onToggleFullContent: () -> Unit,
+    onRefineSummary: (com.samcod3.meditrack.domain.model.RefinementMode) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val sections = parsedLeaflet?.sections ?: emptyList()
-    // State for reading mode
+    // State for reading mode (full content view)
     var isReadingMode by remember { mutableStateOf(false) }
     var selectedSectionIndex by remember { mutableStateOf(0) }
     val readingSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -360,18 +392,74 @@ private fun LeafletContent(
             }
         }
         
-        // Single card to open reading mode
+        // Section list with AI summary option
         if (sections.isNotEmpty()) {
-            ReadLeafletCard(
-                sectionCount = sections.size,
-                onClick = {
-                    selectedSectionIndex = 0
-                    isReadingMode = true
-                    coroutineScope.launch {
-                        readingListState.scrollToItem(0)
+            // Header with "Read all" button
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = "Prospecto",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        // "Read all" button
+                        Surface(
+                            onClick = {
+                                selectedSectionIndex = 0
+                                isReadingMode = true
+                                coroutineScope.launch {
+                                    readingListState.scrollToItem(0)
+                                }
+                            },
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Leer todo",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(12.dp))
+                    
+                    // Section list
+                    sections.forEachIndexed { index, section ->
+                        SectionSummaryCard(
+                            sectionNumber = index + 1,
+                            sectionTitle = cleanSectionTitle(section.title),
+                            onClick = { onSelectSection(index) }
+                        )
+                        if (index < sections.lastIndex) {
+                            Spacer(Modifier.height(8.dp))
+                        }
                     }
                 }
-            )
+            }
         } else {
             // Fallback for when segmented content is not available
             NoSectionsAvailable(medication)
@@ -381,7 +469,337 @@ private fun LeafletContent(
         Spacer(modifier = Modifier.height(80.dp))
     }
     
-    // Reading mode BottomSheet
+    // Section summary BottomSheet
+    if (sectionViewState.sectionIndex >= 0 && sectionViewState.section != null) {
+        val summarySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        val scrollState = rememberScrollState()
+        
+        ModalBottomSheet(
+            onDismissRequest = { onClearSelectedSection() },
+            sheetState = summarySheetState,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                // Section title
+                Text(
+                    text = "${sectionViewState.sectionIndex + 1}. ${cleanSectionTitle(sectionViewState.section.title)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // AI Summary Loading - Glassmorphism style
+                if (sectionViewState.isLoadingSummary) {
+                    // Infinite animation for progress bar
+                    val infiniteTransition = rememberInfiniteTransition(label = "progress")
+                    val progressOffset by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1500, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse  // Bounce back and forth
+                        ),
+                        label = "progressOffset"
+                    )
+                    
+                    // Glassmorphism card
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        tonalElevation = 2.dp,
+                        shadowElevation = 4.dp
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Header with sparkle icon
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = Color(0xFF8B5CF6) // Purple
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                
+                                // Progress message based on stage
+                                val progressMessage = when {
+                                    !sectionViewState.isRetrying -> "Generando resumen..."
+                                    sectionViewState.retryAttempt == 1 -> "Analizando contenido..."
+                                    sectionViewState.retryAttempt == 2 -> "Procesando con Gemini..."
+                                    sectionViewState.retryAttempt == 3 -> "Generación en progreso..."
+                                    else -> "Esperando respuesta..."
+                                }
+                                
+                                Text(
+                                    text = progressMessage,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            Spacer(Modifier.height(12.dp))
+                            
+                            // Gradient progress bar - using BoxWithConstraints for proper width calculation
+                            androidx.compose.foundation.layout.BoxWithConstraints(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            ) {
+                                val barWidthFraction = 0.35f
+                                val maxOffsetPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+                                    maxWidth.toPx() * (1f - barWidthFraction)
+                                }
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(barWidthFraction)
+                                        .fillMaxHeight()
+                                        .offset { IntOffset((progressOffset * maxOffsetPx).toInt(), 0) }
+                                        .background(
+                                            brush = Brush.horizontalGradient(
+                                                colors = listOf(
+                                                    Color(0xFF8B5CF6), // Purple
+                                                    Color(0xFF3B82F6), // Blue
+                                                    Color(0xFF06B6D4)  // Cyan
+                                                )
+                                            ),
+                                            shape = RoundedCornerShape(2.dp)
+                                        )
+                                )
+                            }
+                            
+                            // Subtle hint after 10 seconds
+                            if (sectionViewState.isRetrying && sectionViewState.retryAttempt >= 2) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = "Textos largos pueden tardar más",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                    }
+                } else if (sectionViewState.summaryError != null) {
+                    // Error state - show descriptive error
+                    val isBusyError = sectionViewState.summaryError.contains("BUSY", ignoreCase = true) ||
+                                      sectionViewState.summaryError.contains("quota", ignoreCase = true) ||
+                                      sectionViewState.summaryError.contains("ocupado", ignoreCase = true)
+                    
+                    Surface(
+                        color = if (isBusyError) 
+                            MaterialTheme.colorScheme.secondaryContainer 
+                        else 
+                            MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isBusyError) 
+                                        Icons.Default.Schedule
+                                    else 
+                                        Icons.Default.Error,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = if (isBusyError)
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = if (isBusyError) 
+                                        "Servicio ocupado" 
+                                    else 
+                                        "No se pudo generar el resumen",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isBusyError)
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = if (isBusyError) 
+                                    "Gemini Nano está procesando otras peticiones. Puedes ver el contenido completo abajo o reintentar más tarde."
+                                else
+                                    sectionViewState.summaryError,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isBusyError)
+                                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                else
+                                    MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                            )
+                            
+                            // Retry button for busy errors
+                            if (isBusyError) {
+                                Spacer(Modifier.height(8.dp))
+                                TextButton(
+                                    onClick = { 
+                                        // Re-select the same section to retry
+                                        onSelectSection(sectionViewState.sectionIndex)
+                                    },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Reintentar")
+                                }
+                            }
+                        }
+                    }
+                } else if (sectionViewState.summary != null) {
+                    // AI Summary card
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Resumen IA",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = sectionViewState.summary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            // Refinement options menu - at bottom left
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start
+                            ) {
+                                var showMenu by remember { mutableStateOf(false) }
+                                val sectionTitle = sectionViewState.section?.title ?: ""
+                                val options = com.samcod3.meditrack.domain.model.RefinementMode.getOptionsForSection(sectionTitle)
+                                
+                                Box {
+                                    TextButton(
+                                        onClick = { showMenu = true },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Tune,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            "Opciones",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)
+                                        )
+                                        Icon(
+                                            Icons.Default.ArrowDropDown,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                    
+                                    DropdownMenu(
+                                        expanded = showMenu,
+                                        onDismissRequest = { showMenu = false }
+                                    ) {
+                                        options.forEach { mode ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text("${mode.emoji} ${mode.displayName}")
+                                                },
+                                                onClick = {
+                                                    showMenu = false
+                                                    onRefineSummary(mode)
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Toggle full content button
+                Button(
+                    onClick = { onToggleFullContent() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = if (sectionViewState.showFullContent) 
+                            Icons.Default.KeyboardArrowUp else Icons.AutoMirrored.Filled.MenuBook,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (sectionViewState.showFullContent) "Ocultar contenido" else "Leer sección completa"
+                    )
+                }
+                
+                // Full content (if expanded)
+                AnimatedVisibility(
+                    visible = sectionViewState.showFullContent,
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Column(modifier = Modifier.padding(top = 16.dp)) {
+                        HorizontalDivider()
+                        Spacer(Modifier.height(16.dp))
+                        
+                        // Render content blocks
+                        sectionViewState.section.content.forEach { block ->
+                            RenderContentBlockInSheet(block)
+                            Spacer(Modifier.height(8.dp))
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(32.dp))
+            }
+        }
+    }
+    
+    // Reading mode BottomSheet (read all sections)
     if (isReadingMode && sections.isNotEmpty()) {
         ModalBottomSheet(
             onDismissRequest = { isReadingMode = false },
@@ -494,6 +912,146 @@ private fun LeafletContent(
 // Helper to clean section titles
 private fun cleanSectionTitle(title: String): String {
     return title.replace(Regex("^\\d+\\.?\\d*\\.?\\s*"), "").trim()
+}
+
+/**
+ * Card for section selection in the section list.
+ */
+@Composable
+private fun SectionSummaryCard(
+    sectionNumber: Int,
+    sectionTitle: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "$sectionNumber",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            Spacer(Modifier.width(12.dp))
+            
+            Text(
+                text = sectionTitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = "Ver resumen IA",
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Renders a ContentBlock in the summary BottomSheet.
+ */
+@Composable
+private fun RenderContentBlockInSheet(block: ContentBlock) {
+    when (block) {
+        is ContentBlock.Paragraph -> {
+            Text(
+                text = parseFormattedText(block.text),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        is ContentBlock.Bold -> {
+            Text(
+                text = block.text,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        is ContentBlock.Italic -> {
+            Text(
+                text = block.text,
+                style = MaterialTheme.typography.bodyMedium,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        is ContentBlock.BulletItem -> {
+            Row {
+                Text("• ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = parseFormattedText(block.text),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+        is ContentBlock.NumberedItem -> {
+            Row {
+                Text("${block.number}. ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = parseFormattedText(block.text),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+        is ContentBlock.SubHeading -> {
+            Text(
+                text = block.text.uppercase(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+/**
+ * Parse text with **bold** markers into AnnotatedString.
+ */
+private fun parseFormattedText(text: String): AnnotatedString {
+    return buildAnnotatedString {
+        val boldPattern = Regex("\\*\\*(.+?)\\*\\*")
+        var lastIndex = 0
+        
+        for (match in boldPattern.findAll(text)) {
+            // Append text before the match
+            append(text.substring(lastIndex, match.range.first))
+            // Append the bold text
+            pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+            append(match.groupValues[1])
+            pop()
+            lastIndex = match.range.last + 1
+        }
+        
+        // Append remaining text
+        if (lastIndex < text.length) {
+            append(text.substring(lastIndex))
+        }
+    }
 }
 
 // Removed cleanHtmlContent helper

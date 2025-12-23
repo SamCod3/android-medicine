@@ -111,4 +111,15 @@ class HybridAIService(
     }
     
     override fun isAvailable(): Boolean = true // Always available (has fallback)
+    
+    /**
+     * Generate text response - try Gemini first, fallback returns null
+     */
+    override suspend fun generateTextResponse(prompt: String): String? {
+        val geminiResult = geminiService.generateTextResponse(prompt)
+        if (!geminiResult.isNullOrBlank()) {
+            return geminiResult
+        }
+        return fallbackService.generateTextResponse(prompt)
+    }
 }

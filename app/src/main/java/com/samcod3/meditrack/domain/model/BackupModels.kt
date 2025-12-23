@@ -1,78 +1,85 @@
 package com.samcod3.meditrack.domain.model
 
-import com.samcod3.meditrack.data.local.entity.MedicationEntity
-import com.samcod3.meditrack.data.local.entity.ReminderEntity
-import com.samcod3.meditrack.data.local.entity.ProfileEntity
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
 
 /**
  * Complete backup of a profile's data.
+ * Version 2: Full serialization with Moshi, all fields preserved.
  */
+@JsonClass(generateAdapter = true)
 data class ProfileBackup(
-    val version: Int = 1,
-    val exportDate: Long = System.currentTimeMillis(),
-    val profile: ProfileData,
-    val medications: List<MedicationBackup>
-)
+    @Json(name = "version") val version: Int = CURRENT_VERSION,
+    @Json(name = "exportDate") val exportDate: Long = System.currentTimeMillis(),
+    @Json(name = "appVersion") val appVersion: String = "1.0.0",
+    @Json(name = "profile") val profile: ProfileData,
+    @Json(name = "medications") val medications: List<MedicationBackup>
+) {
+    companion object {
+        const val CURRENT_VERSION = 2
+        const val MIN_SUPPORTED_VERSION = 1
+    }
+}
 
+@JsonClass(generateAdapter = true)
 data class ProfileData(
-    val name: String,
-    val notes: String? = null
+    @Json(name = "name") val name: String,
+    @Json(name = "notes") val notes: String? = null
 )
 
+@JsonClass(generateAdapter = true)
 data class MedicationBackup(
-    val nationalCode: String,
-    val name: String,
-    val description: String?,
-    val notes: String?,
-    val active: Boolean,
-    val reminders: List<ReminderBackup>
+    @Json(name = "nationalCode") val nationalCode: String,
+    @Json(name = "name") val name: String,
+    @Json(name = "description") val description: String?,
+    @Json(name = "notes") val notes: String?,
+    @Json(name = "active") val active: Boolean = true,
+    @Json(name = "startDate") val startDate: Long? = null,
+    @Json(name = "reminders") val reminders: List<ReminderBackup>
 )
 
+@JsonClass(generateAdapter = true)
 data class ReminderBackup(
-    val hour: Int,
-    val minute: Int,
-    val scheduleType: String,
-    val daysOfWeek: Int,
-    val intervalDays: Int,
-    val dayOfMonth: Int,
-    val dosageQuantity: Int,
-    val dosageType: String,
-    val dosagePortion: String?,
-    val enabled: Boolean
+    @Json(name = "hour") val hour: Int,
+    @Json(name = "minute") val minute: Int,
+    @Json(name = "scheduleType") val scheduleType: String,
+    @Json(name = "daysOfWeek") val daysOfWeek: Int,
+    @Json(name = "intervalDays") val intervalDays: Int,
+    @Json(name = "dayOfMonth") val dayOfMonth: Int,
+    @Json(name = "dosageQuantity") val dosageQuantity: Int,
+    @Json(name = "dosageType") val dosageType: String,
+    @Json(name = "dosagePortion") val dosagePortion: String?,
+    @Json(name = "enabled") val enabled: Boolean = true
 )
 
 /**
- * Extension functions for converting entities to backup models.
+ * Result of a backup import operation.
  */
-fun MedicationEntity.toBackup(reminders: List<ReminderEntity>): MedicationBackup {
-    return MedicationBackup(
-        nationalCode = this.nationalCode,
-        name = this.name,
-        description = this.description,
-        notes = this.notes,
-        active = this.active,
-        reminders = reminders.map { it.toBackup() }
-    )
+data class BackupImportResult(
+    val medicationsImported: Int,
+    val medicationsSkipped: Int,
+    val remindersImported: Int,
+    val remindersFailed: Int,
+    val warnings: List<String>
+) {
+    val hasWarnings: Boolean get() = warnings.isNotEmpty()
+    val isSuccess: Boolean get() = medicationsImported > 0 || medicationsSkipped > 0
 }
 
-fun ReminderEntity.toBackup(): ReminderBackup {
-    return ReminderBackup(
-        hour = this.hour,
-        minute = this.minute,
-        scheduleType = this.scheduleType,
-        daysOfWeek = this.daysOfWeek,
-        intervalDays = this.intervalDays,
-        dayOfMonth = this.dayOfMonth,
-        dosageQuantity = this.dosageQuantity,
-        dosageType = this.dosageType,
-        dosagePortion = this.dosagePortion,
-        enabled = this.enabled
-    )
+/**
+ * Import strategy options.
+ */
+enum class ImportStrategy {
+    REPLACE_ALL,      // Delete existing, import all
+    MERGE_SKIP_EXISTING, // Keep existing, add new only  
+    MERGE_UPDATE_EXISTING // Update existing with backup data, add new
 }
 
-fun ProfileEntity.toProfileData(): ProfileData {
-    return ProfileData(
-        name = this.name,
-        notes = null // ProfileEntity doesn't have notes field
-    )
+/**
+ * Backup version validation result.
+ */
+sealed class VersionValidation {
+    data object Ok : VersionValidation()
+    data class Warning(val message: String) : VersionValidation()
+    data class Error(val message: String) : VersionValidation()
 }

@@ -117,14 +117,19 @@ fun MyTreatmentScreen(
                     val jsonText = context.contentResolver.openInputStream(jsonUri)?.bufferedReader()?.use { it.readText() } ?: ""
                     if (jsonText.isNotBlank()) {
                         viewModel.importBackup(jsonText) { result ->
-                            if (result > 0) {
-                                android.widget.Toast.makeText(
-                                    context, 
-                                    "Importados $result medicamentos", 
-                                    android.widget.Toast.LENGTH_LONG
-                                ).show()
+                            if (result != null) {
+                                val message = when {
+                                    result.medicationsImported > 0 && result.medicationsSkipped > 0 ->
+                                        "Importados ${result.medicationsImported} medicamentos (${result.medicationsSkipped} ya existían)"
+                                    result.medicationsImported > 0 ->
+                                        "Importados ${result.medicationsImported} medicamentos"
+                                    result.medicationsSkipped > 0 ->
+                                        "Todos los ${result.medicationsSkipped} medicamentos ya existían"
+                                    else ->
+                                        "Backup vacío"
+                                }
+                                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
                             } else {
-                                // Error is stored in viewModel.backupError
                                 val error = viewModel.backupError.value ?: "Error desconocido"
                                 android.widget.Toast.makeText(
                                     context, 

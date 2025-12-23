@@ -23,7 +23,8 @@ val appModule = module {
             userMedicationRepository = get(),
             reminderRepository = get(),
             medicationDao = get(),
-            aiLeafletParser = get()
+            aiLeafletParser = get(),
+            sectionSummaryUseCase = get()
         ) 
     }
     viewModel { ProfileViewModel(get()) }

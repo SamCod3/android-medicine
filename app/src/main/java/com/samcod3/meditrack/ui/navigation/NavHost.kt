@@ -13,6 +13,7 @@ import com.samcod3.meditrack.ui.screens.main.MainScreen
 import com.samcod3.meditrack.ui.screens.profiles.ProfileViewModel
 import com.samcod3.meditrack.ui.screens.profiles.ProfilesScreen
 import com.samcod3.meditrack.ui.screens.reminders.ReminderScreen
+import com.samcod3.meditrack.ui.screens.settings.SettingsScreen
 import com.samcod3.meditrack.ui.screens.treatment.MyTreatmentScreen
 import org.koin.androidx.compose.koinViewModel
 
@@ -33,6 +34,7 @@ sealed class Screen(val route: String) {
         fun createRoute(profileId: String, profileName: String) = 
             "treatment/$profileId/${java.net.URLEncoder.encode(profileName, "UTF-8")}"
     }
+    data object Settings : Screen("settings")
 }
 
 @Composable
@@ -86,6 +88,9 @@ fun MediTrackNavHost() {
                     navController.navigate(Screen.Profiles.route) {
                         popUpTo(Screen.Main.route) { inclusive = true }
                     }
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -159,6 +164,12 @@ fun MediTrackNavHost() {
                 onMedicationClick = { nationalCode ->
                     navController.navigate(Screen.Leaflet.createRoute(nationalCode, profileId))
                 }
+            )
+        }
+        
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

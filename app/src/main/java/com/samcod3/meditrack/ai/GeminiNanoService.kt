@@ -386,7 +386,10 @@ Return ONLY valid JSON."""
      * Parses leaflet HTML to extract structured sections using Gemini Nano.
      */
     /**
-     * Structures a specific HTML content fragment into ContentBlocks using Gemini Nano.
+     * Generates a leaflet summary by processing sections individually.
+     * This respects Gemini Nano's 1024 token limit per prompt.
+     * 
+     * Strategy: Extract key info from each relevant section, then combine.
      */
     override suspend fun generateLeafletSummary(html: String): LeafletSummary? {
         if (!initialized) {
@@ -398,40 +401,123 @@ Return ONLY valid JSON."""
         }
 
         return try {
-            // Aggressive truncation for summary (first 8k chars usually contain the important stuff)
-            val cleanHtml = cleanHtmlForAI(html)
-            val truncatedHtml = if (cleanHtml.length > 8000) {
-                cleanHtml.substring(0, 8000) + "..."
-            } else {
-                cleanHtml
-            }
-
-            val response = withContext(Dispatchers.IO) {
-                generativeModel!!.generateContent(SUMMARY_PROMPT + truncatedHtml)
-            }
-
-            val responseText = response.candidates.firstOrNull()?.text?.trim() ?: ""
-            if (responseText.isBlank()) return null
+            // Parse sections using LeafletHtmlParser
+            val sections = com.samcod3.meditrack.data.remote.parser.LeafletHtmlParser.parse(html)
             
-            // Extract JSON
-            val jsonStart = responseText.indexOf('{')
-            val jsonEnd = responseText.lastIndexOf('}')
+            if (sections.isEmpty()) {
+                Log.w(TAG, "No sections found for summary")
+                return null
+            }
             
-            if (jsonStart != -1 && jsonEnd != -1) {
-                val jsonString = responseText.substring(jsonStart, jsonEnd + 1)
-                val json = JSONObject(jsonString)
+            // Map section numbers to summary fields
+            // Section 1: Qué es y para qué → indications
+            // Section 3: Cómo tomar → dosage  
+            // Section 2 or 4: Advertencias/Efectos → warnings
+            
+            var indications = ""
+            var dosage = ""
+            var warnings = ""
+            
+            // Process relevant sections individually (respecting token limits)
+            for (section in sections) {
+                val cleanContent = cleanHtmlForAI(section.content)
+                // Limit each section to ~3000 chars (~750 tokens) to stay under 1024 with prompt
+                val truncatedContent = cleanContent.take(3000)
                 
+                if (truncatedContent.isBlank()) continue
+                
+                when (section.number) {
+                    1 -> {
+                        // Qué es y para qué se utiliza
+                        indications = extractSectionSummary(truncatedContent, "indicaciones")
+                    }
+                    3 -> {
+                        // Cómo tomar
+                        dosage = extractSectionSummary(truncatedContent, "posología")
+                    }
+                    2 -> {
+                        // Antes de tomar (advertencias)
+                        warnings = extractSectionSummary(truncatedContent, "advertencias")
+                    }
+                    4 -> {
+                        // Efectos adversos (solo si no tenemos warnings del section 2)
+                        if (warnings.isBlank()) {
+                            warnings = extractSectionSummary(truncatedContent, "efectos adversos")
+                        }
+                    }
+                }
+                
+                // Early exit if we have all three
+                if (indications.isNotBlank() && dosage.isNotBlank() && warnings.isNotBlank()) {
+                    break
+                }
+            }
+            
+            // Only return summary if we got at least indications
+            if (indications.isNotBlank()) {
                 LeafletSummary(
-                    indications = json.optString("indications", "").trim(),
-                    dosage = json.optString("dosage", "").trim(),
-                    warnings = json.optString("warnings", "").trim()
+                    indications = indications,
+                    dosage = dosage.ifBlank { "Ver sección 3 del prospecto" },
+                    warnings = warnings.ifBlank { "Ver sección 2 del prospecto" }
                 )
             } else {
+                Log.w(TAG, "Could not extract indications from sections")
                 null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error generating summary", e)
+            Log.e(TAG, "Error generating summary from sections", e)
             null
+        }
+    }
+    
+    /**
+     * Extract a useful summary from a section for a specific field.
+     * Prompts are tailored per field to get more specific information.
+     */
+    private suspend fun extractSectionSummary(sectionContent: String, field: String): String {
+        val prompt = when (field) {
+            "indicaciones" -> """De este texto de prospecto, extrae PARA QUÉ SIRVE el medicamento.
+Responde en 1-2 frases claras y directas. Ejemplo: "Alivio del dolor leve a moderado y fiebre."
+
+Texto:
+$sectionContent"""
+            "posología" -> """De este texto de prospecto, extrae CÓMO SE TOMA el medicamento (dosis y frecuencia).
+Responde en 1-2 frases. Ejemplo: "1 comprimido cada 8 horas. Máximo 3 al día."
+
+Texto:
+$sectionContent"""
+            "advertencias" -> """De este texto de prospecto, extrae las PRECAUCIONES más importantes (contraindicaciones, interacciones, embarazo).
+Responde en 1-2 frases. Ejemplo: "No tomar con alcohol. Contraindicado en embarazo y úlcera gástrica."
+
+Texto:
+$sectionContent"""
+            "efectos adversos" -> """De este texto de prospecto, extrae los EFECTOS SECUNDARIOS más frecuentes.
+Responde en 1-2 frases. Ejemplo: "Puede causar náuseas, dolor de cabeza y mareos."
+
+Texto:
+$sectionContent"""
+            else -> """Resume este texto en 1-2 frases:
+$sectionContent"""
+        }
+
+        return try {
+            val response = withContext(Dispatchers.IO) {
+                kotlinx.coroutines.withTimeout(15_000L) { // 15 second timeout
+                    generativeModel!!.generateContent(prompt)
+                }
+            }
+            
+            val text = response.candidates.firstOrNull()?.text?.trim() ?: ""
+            // Clean up response - remove quotes
+            text.removeSurrounding("\"")
+                .replace("\n", " ")
+                .take(300) // Allow longer responses
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            Log.w(TAG, "Timeout extracting $field")
+            ""
+        } catch (e: Exception) {
+            Log.e(TAG, "Error extracting $field", e)
+            ""
         }
     }
 
@@ -746,5 +832,132 @@ Return ONLY valid JSON."""
         
         Log.d(TAG, "Fallback parsing recovered ${medications.size} medications")
         return medications
+    }
+    
+    /**
+     * Generate a text response from any prompt.
+     * Used for summarization and other text generation tasks.
+     * 
+     * NOTE: Gemini Nano requires the app to be in TOP foreground.
+     * Implements exponential backoff for BUSY errors (ErrorCode 9).
+     */
+    override suspend fun generateTextResponse(prompt: String): String? {
+        if (!initialized) {
+            initializeModel()
+        }
+        
+        if (featureStatus != FeatureStatus.AVAILABLE || generativeModel == null) {
+            Log.d(TAG, "generateTextResponse: Gemini Nano not available")
+            return null
+        }
+        
+        // Exponential backoff with max 3 retries
+        val maxRetries = 3
+        var lastError: Exception? = null
+        
+        for (attempt in 0 until maxRetries) {
+            try {
+                if (attempt > 0) {
+                    // Exponential backoff: 1s, 2s, 4s
+                    val delayMs = (1000L * (1 shl (attempt - 1)))
+                    Log.d(TAG, "generateTextResponse: Retry $attempt after ${delayMs}ms")
+                    kotlinx.coroutines.delay(delayMs)
+                }
+                
+                val response = withContext(Dispatchers.Default) {
+                    generativeModel!!.generateContent(prompt)
+                }
+                
+                val result = response.candidates
+                    .firstOrNull()
+                    ?.text
+                    ?.trim()
+                
+                if (result != null) {
+                    Log.d(TAG, "generateTextResponse: Got ${result.length} chars on attempt $attempt")
+                    return result
+                }
+            } catch (e: Exception) {
+                lastError = e
+                val errorMessage = e.message ?: ""
+                
+                // Check if it's a BUSY error (ErrorCode 9) - worth retrying
+                if (errorMessage.contains("ErrorCode 9") || 
+                    errorMessage.contains("BUSY") ||
+                    errorMessage.contains("quota")) {
+                    Log.w(TAG, "generateTextResponse: BUSY/quota error on attempt $attempt, will retry")
+                    continue
+                }
+                
+                // Other errors - don't retry
+                Log.e(TAG, "generateTextResponse: Non-retryable error", e)
+                break
+            }
+        }
+        
+        Log.e(TAG, "generateTextResponse: All retries failed", lastError)
+        return null
+    }
+    
+    /**
+     * Generate text response with progress callback for retries.
+     */
+    override suspend fun generateTextResponseWithProgress(
+        prompt: String,
+        onRetry: (attempt: Int, maxRetries: Int) -> Unit
+    ): String? {
+        if (!isAvailable()) {
+            Log.d(TAG, "generateTextResponseWithProgress: Gemini Nano not available")
+            return null
+        }
+        
+        val maxRetries = 3
+        var lastError: Exception? = null
+        
+        for (attempt in 0 until maxRetries) {
+            try {
+                if (attempt > 0) {
+                    // Notify UI about retry
+                    onRetry(attempt, maxRetries)
+                    
+                    // Exponential backoff: 1s, 2s, 4s
+                    val delayMs = (1000L * (1 shl (attempt - 1)))
+                    Log.d(TAG, "generateTextResponseWithProgress: Retry $attempt after ${delayMs}ms")
+                    kotlinx.coroutines.delay(delayMs)
+                }
+                
+                val response = withContext(Dispatchers.Default) {
+                    generativeModel!!.generateContent(prompt)
+                }
+                
+                val result = response.candidates
+                    .firstOrNull()
+                    ?.text
+                    ?.trim()
+                
+                if (result != null) {
+                    Log.d(TAG, "generateTextResponseWithProgress: Got ${result.length} chars on attempt $attempt")
+                    return result
+                }
+            } catch (e: Exception) {
+                lastError = e
+                val errorMessage = e.message ?: ""
+                
+                // Check if it's a BUSY error (ErrorCode 9) - worth retrying
+                if (errorMessage.contains("ErrorCode 9") || 
+                    errorMessage.contains("BUSY") ||
+                    errorMessage.contains("quota")) {
+                    Log.w(TAG, "generateTextResponseWithProgress: BUSY/quota error on attempt $attempt, will retry")
+                    continue
+                }
+                
+                // Other errors - don't retry
+                Log.e(TAG, "generateTextResponseWithProgress: Non-retryable error", e)
+                break
+            }
+        }
+        
+        Log.e(TAG, "generateTextResponseWithProgress: All retries failed", lastError)
+        return null
     }
 }

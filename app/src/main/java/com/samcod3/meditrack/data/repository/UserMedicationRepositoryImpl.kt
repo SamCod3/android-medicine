@@ -7,7 +7,6 @@ import com.samcod3.meditrack.domain.repository.UserMedicationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 class UserMedicationRepositoryImpl(
@@ -28,36 +27,13 @@ class UserMedicationRepositoryImpl(
         notes: String?
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            // 1. Check exact match (idempotency)
+            // Check exact match by nationalCode (idempotency)
             val existing = medicationDao.getMedicationByNationalCodeAndProfile(nationalCode, profileId)
             if (existing != null) {
                 return@withContext Result.success(existing.id)
             }
             
-            // 2. Check FUZZY match by NAME (Smart Deduplication)
-            // Fetch all active medications to check names
-            // Note: For performance with large lists, this should be a DB query, but for simple user profiles it's fine.
-            val allMedications = medicationDao.getAllMedicationsForProfile(profileId).first()
-            
-            val cleanName = name.lowercase().replace(Regex("\\s\\d+.*"), "").trim()
-            val fuzzyMatch = allMedications.find { 
-                it.active && 
-                it.name.lowercase().replace(Regex("\\s\\d+.*"), "").trim() == cleanName 
-            }
-            
-            if (fuzzyMatch != null) {
-                // Found a likely duplicate (e.g. Imported "Enalapril" vs Scanned "Enalapril 20mg").
-                // UPDATE the existing one to the new (better) data.
-                val updatedEntity = fuzzyMatch.copy(
-                    nationalCode = nationalCode, // Update to Real CN
-                    name = name,
-                    description = description,
-                    notes = notes ?: fuzzyMatch.notes // Keep existing notes if new ones empty? Or override? Usually keep.
-                )
-                medicationDao.updateMedication(updatedEntity)
-                return@withContext Result.success(updatedEntity.id)
-            }
-
+            // Insert new medication (no fuzzy deduplication - different CN = different medication)
             val entity = MedicationEntity(
                 profileId = profileId,
                 nationalCode = nationalCode,
