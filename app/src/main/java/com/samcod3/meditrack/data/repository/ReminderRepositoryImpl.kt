@@ -1,6 +1,8 @@
 package com.samcod3.meditrack.data.repository
 
+import android.content.Context
 import com.samcod3.meditrack.data.local.dao.MedicationDao
+import com.samcod3.meditrack.data.local.dao.ProfileDao
 import com.samcod3.meditrack.data.local.dao.ReminderDao
 import com.samcod3.meditrack.data.local.entity.DosageType
 import com.samcod3.meditrack.data.local.entity.Portion
@@ -8,13 +10,18 @@ import com.samcod3.meditrack.data.local.entity.ReminderEntity
 import com.samcod3.meditrack.data.local.entity.ScheduleType
 import com.samcod3.meditrack.domain.model.Reminder
 import com.samcod3.meditrack.domain.repository.ReminderRepository
+import com.samcod3.meditrack.notification.ReminderAlarmScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class ReminderRepositoryImpl(
     private val reminderDao: ReminderDao,
-    private val medicationDao: MedicationDao
+    private val medicationDao: MedicationDao,
+    private val profileDao: ProfileDao,
+    private val context: Context
 ) : ReminderRepository {
+    
+    private val alarmScheduler = ReminderAlarmScheduler(context)
     
     override fun getRemindersForMedication(medicationId: String): Flow<List<Reminder>> {
         return reminderDao.getRemindersForMedication(medicationId).map { entities ->
@@ -69,6 +76,10 @@ class ReminderRepositoryImpl(
             dosagePortion = dosagePortion?.name
         )
         reminderDao.insert(entity)
+        
+        // Schedule the alarm
+        val reminder = entity.toDomain()
+        alarmScheduler.scheduleReminder(reminder)
     }
     
     override suspend fun updateReminder(reminder: Reminder) {
@@ -88,14 +99,24 @@ class ReminderRepositoryImpl(
             enabled = reminder.enabled
         )
         reminderDao.update(entity)
+        
+        // Reschedule or cancel based on enabled state
+        alarmScheduler.scheduleReminder(reminder)
     }
     
     override suspend fun deleteReminder(id: String) {
+        alarmScheduler.cancelReminder(id)
         reminderDao.deleteById(id)
     }
     
     override suspend fun setReminderEnabled(id: String, enabled: Boolean) {
         reminderDao.setEnabled(id, enabled)
+        
+        // Reschedule or cancel based on new state
+        val reminder = reminderDao.getReminderById(id)?.toDomain()
+        if (reminder != null) {
+            alarmScheduler.scheduleReminder(reminder)
+        }
     }
 
     override suspend fun moveReminders(fromMedId: String, toMedId: String) {
@@ -104,11 +125,15 @@ class ReminderRepositoryImpl(
     
     private suspend fun ReminderEntity.toDomain(): Reminder {
         val medication = medicationDao.getMedicationById(medicationId)
+        val profile = medication?.profileId?.let { profileDao.getProfileById(it) }
+        
         return Reminder(
             id = id,
             medicationId = medicationId,
             medicationName = medication?.name ?: "",
             nationalCode = medication?.nationalCode ?: "",
+            profileId = medication?.profileId ?: "",
+            profileName = profile?.name ?: "",
             hour = hour,
             minute = minute,
             scheduleType = ScheduleType.entries.find { it.name == scheduleType } ?: ScheduleType.DAILY,

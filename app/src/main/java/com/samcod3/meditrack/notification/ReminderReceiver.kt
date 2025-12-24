@@ -20,14 +20,20 @@ class ReminderReceiver : BroadcastReceiver() {
         val reminderId = intent.getStringExtra(ReminderAlarmScheduler.EXTRA_REMINDER_ID) ?: return
         val medicationName = intent.getStringExtra(ReminderAlarmScheduler.EXTRA_MEDICATION_NAME) ?: "Medicamento"
         val dosage = intent.getStringExtra(ReminderAlarmScheduler.EXTRA_DOSAGE)
+        val profileId = intent.getStringExtra(ReminderAlarmScheduler.EXTRA_PROFILE_ID) ?: ""
+        val profileName = intent.getStringExtra(ReminderAlarmScheduler.EXTRA_PROFILE_NAME) ?: ""
         
-        Log.d(TAG, "Received reminder: $reminderId for $medicationName")
+        Log.d(TAG, "Received reminder: $reminderId for $medicationName (profile: $profileName)")
         
         val notificationHelper = ReminderNotificationHelper(context)
-        notificationHelper.showReminderNotification(reminderId, medicationName, dosage)
+        notificationHelper.showReminderNotification(
+            reminderId = reminderId,
+            medicationName = medicationName,
+            dosage = dosage,
+            profileId = profileId,
+            profileName = profileName
+        )
         
         // TODO: Reschedule for next occurrence if it's a repeating alarm
-        // This would require accessing the repository, which is tricky in a BroadcastReceiver
-        // Consider using WorkManager for more complex scheduling
     }
 }

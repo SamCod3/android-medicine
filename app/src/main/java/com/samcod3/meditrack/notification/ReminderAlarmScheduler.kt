@@ -20,6 +20,8 @@ class ReminderAlarmScheduler(private val context: Context) {
         const val EXTRA_REMINDER_ID = "reminder_id"
         const val EXTRA_MEDICATION_NAME = "medication_name"
         const val EXTRA_DOSAGE = "dosage"
+        const val EXTRA_PROFILE_ID = "profile_id"
+        const val EXTRA_PROFILE_NAME = "profile_name"
     }
     
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -35,6 +37,8 @@ class ReminderAlarmScheduler(private val context: Context) {
             putExtra(EXTRA_REMINDER_ID, reminder.id)
             putExtra(EXTRA_MEDICATION_NAME, reminder.medicationName)
             putExtra(EXTRA_DOSAGE, reminder.dosageFormatted)
+            putExtra(EXTRA_PROFILE_ID, reminder.profileId)
+            putExtra(EXTRA_PROFILE_NAME, reminder.profileName)
         }
         
         val pendingIntent = PendingIntent.getBroadcast(

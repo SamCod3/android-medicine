@@ -45,22 +45,33 @@ sealed class Screen(val route: String) {
 }
 
 @Composable
-fun MediTrackNavHost() {
+fun MediTrackNavHost(
+    deepLinkProfileId: String? = null,
+    deepLinkProfileName: String? = null
+) {
     val navController = rememberNavController()
     val userPreferencesRepository: UserPreferencesRepository = koinInject()
     val scope = rememberCoroutineScope()
     
-    // Determine start destination synchronously to avoid flash
-    // This is a quick DataStore read, safe to do with runBlocking
-    val (startDestination, initialProfileId, initialProfileName) = remember {
-        kotlinx.coroutines.runBlocking {
-            val savedProfileId = userPreferencesRepository.activeProfileIdFlow.first()
-            val savedProfileName = userPreferencesRepository.activeProfileNameFlow.first()
-            
-            if (savedProfileId != null && savedProfileName != null) {
-                Triple(Screen.Main.createRoute(savedProfileId, savedProfileName), savedProfileId, savedProfileName)
-            } else {
-                Triple(Screen.Profiles.route, null, null)
+    // Determine start destination:
+    // 1. Deep link from notification (highest priority)
+    // 2. Saved profile in DataStore
+    // 3. Default to Profiles screen
+    val (startDestination, initialProfileId, initialProfileName) = remember(deepLinkProfileId, deepLinkProfileName) {
+        // Deep link from notification takes priority
+        if (!deepLinkProfileId.isNullOrBlank() && !deepLinkProfileName.isNullOrBlank()) {
+            Triple(Screen.Main.createRoute(deepLinkProfileId, deepLinkProfileName), deepLinkProfileId, deepLinkProfileName)
+        } else {
+            // Check DataStore for saved profile
+            kotlinx.coroutines.runBlocking {
+                val savedProfileId = userPreferencesRepository.activeProfileIdFlow.first()
+                val savedProfileName = userPreferencesRepository.activeProfileNameFlow.first()
+                
+                if (savedProfileId != null && savedProfileName != null) {
+                    Triple(Screen.Main.createRoute(savedProfileId, savedProfileName), savedProfileId, savedProfileName)
+                } else {
+                    Triple(Screen.Profiles.route, null, null)
+                }
             }
         }
     }

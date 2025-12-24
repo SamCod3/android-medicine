@@ -47,7 +47,7 @@ val dataModule = module {
     single<DrugRepository> { DrugRepositoryImpl(get()) }
     single<ProfileRepository> { ProfileRepositoryImpl(get()) }
     single<UserMedicationRepository> { UserMedicationRepositoryImpl(get()) }
-    single<ReminderRepository> { ReminderRepositoryImpl(get(), get()) }
+    single<ReminderRepository> { ReminderRepositoryImpl(get(), get(), get(), androidContext()) }
     
     // AI Service - HybridAIService tries Gemini Nano first, falls back to regex
     single<AIService> {

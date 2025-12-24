@@ -12,6 +12,8 @@ data class Reminder(
     val medicationId: String,
     val medicationName: String = "",
     val nationalCode: String = "", // For navigation to medication detail
+    val profileId: String = "",    // For deep linking to correct profile
+    val profileName: String = "",  // For display in notification
     val hour: Int,
     val minute: Int,
     // Schedule configuration

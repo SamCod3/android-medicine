@@ -23,6 +23,10 @@ class ReminderNotificationHelper(private val context: Context) {
         const val CHANNEL_ID = "medication_reminders"
         const val CHANNEL_NAME = "Recordatorios de Medicación"
         const val CHANNEL_DESCRIPTION = "Notificaciones para recordatorios de toma de medicamentos"
+        
+        // Extras for deep linking
+        const val EXTRA_PROFILE_ID = "profile_id"
+        const val EXTRA_PROFILE_NAME = "profile_name"
     }
     
     init {
@@ -43,9 +47,18 @@ class ReminderNotificationHelper(private val context: Context) {
         }
     }
     
-    fun showReminderNotification(reminderId: String, medicationName: String, dosage: String?) {
+    fun showReminderNotification(
+        reminderId: String, 
+        medicationName: String, 
+        dosage: String?,
+        profileId: String,
+        profileName: String
+    ) {
+        // Intent to open app at the correct profile
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_PROFILE_ID, profileId)
+            putExtra(EXTRA_PROFILE_NAME, profileName)
         }
         
         val pendingIntent = PendingIntent.getActivity(
@@ -55,25 +68,27 @@ class ReminderNotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        val contentText = buildString {
-            append("Es hora de tomar $medicationName")
-            if (!dosage.isNullOrBlank()) {
-                append(" - $dosage")
-            }
+        // Title: "💊 Nombre del perfil"
+        val title = if (profileName.isNotBlank()) "💊 $profileName" else "💊 Recordatorio"
+        
+        // Content: "Medicamento - dosis" (short and clear)
+        val contentText = if (!dosage.isNullOrBlank()) {
+            "$medicationName · $dosage"
+        } else {
+            medicationName
         }
         
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground) // TODO: Use proper medication icon
-            .setContentTitle("💊 Recordatorio de medicación")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(title)
             .setContentText(contentText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .addAction(
                 R.drawable.ic_launcher_foreground,
-                "Tomado",
+                "✓ Tomado",
                 createMarkAsTakenIntent(reminderId)
             )
             .build()
@@ -102,3 +117,4 @@ class ReminderNotificationHelper(private val context: Context) {
         )
     }
 }
+
