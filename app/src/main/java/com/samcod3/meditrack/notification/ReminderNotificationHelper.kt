@@ -48,11 +48,14 @@ class ReminderNotificationHelper(private val context: Context) {
     }
     
     fun showReminderNotification(
-        reminderId: String, 
+        reminderId: String,
+        medicationId: String,
         medicationName: String, 
         dosage: String?,
         profileId: String,
-        profileName: String
+        profileName: String,
+        hour: Int,
+        minute: Int
     ) {
         // Intent to open app at the correct profile
         val intent = Intent(context, MainActivity::class.java).apply {
@@ -71,7 +74,7 @@ class ReminderNotificationHelper(private val context: Context) {
         // Title: "💊 Nombre del perfil"
         val title = if (profileName.isNotBlank()) "💊 $profileName" else "💊 Recordatorio"
         
-        // Content: "Medicamento - dosis" (short and clear)
+        // Content: "Medicamento · dosis" (short and clear)
         val contentText = if (!dosage.isNullOrBlank()) {
             "$medicationName · $dosage"
         } else {
@@ -89,7 +92,12 @@ class ReminderNotificationHelper(private val context: Context) {
             .addAction(
                 R.drawable.ic_launcher_foreground,
                 "✓ Tomado",
-                createMarkAsTakenIntent(reminderId)
+                createActionIntent(reminderId, medicationId, medicationName, profileId, hour, minute, true)
+            )
+            .addAction(
+                R.drawable.ic_launcher_foreground,
+                "✗ Omitir",
+                createActionIntent(reminderId, medicationId, medicationName, profileId, hour, minute, false)
             )
             .build()
         
@@ -103,15 +111,30 @@ class ReminderNotificationHelper(private val context: Context) {
         }
     }
     
-    private fun createMarkAsTakenIntent(reminderId: String): PendingIntent {
+    private fun createActionIntent(
+        reminderId: String,
+        medicationId: String,
+        medicationName: String,
+        profileId: String,
+        hour: Int,
+        minute: Int,
+        isTaken: Boolean
+    ): PendingIntent {
+        val action = if (isTaken) ReminderActionReceiver.ACTION_MARK_TAKEN else ReminderActionReceiver.ACTION_MARK_SKIPPED
         val intent = Intent(context, ReminderActionReceiver::class.java).apply {
-            action = ReminderActionReceiver.ACTION_MARK_TAKEN
+            this.action = action
             putExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, reminderId)
+            putExtra(ReminderActionReceiver.EXTRA_MEDICATION_ID, medicationId)
+            putExtra(ReminderActionReceiver.EXTRA_MEDICATION_NAME, medicationName)
+            putExtra(ReminderActionReceiver.EXTRA_PROFILE_ID, profileId)
+            putExtra(ReminderActionReceiver.EXTRA_HOUR, hour)
+            putExtra(ReminderActionReceiver.EXTRA_MINUTE, minute)
         }
         
+        val requestCode = if (isTaken) "taken_$reminderId" else "skip_$reminderId"
         return PendingIntent.getBroadcast(
             context,
-            "taken_$reminderId".hashCode(),
+            requestCode.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

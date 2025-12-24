@@ -48,7 +48,8 @@ val appModule = module {
     viewModel { params ->
         AllRemindersViewModel(
             profileId = params[0],
-            reminderRepository = get()
+            reminderRepository = get(),
+            doseLogDao = get()
         )
     }
     // MyTreatmentViewModel for treatment summary (filtered by profile)

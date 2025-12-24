@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,16 +23,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
@@ -77,6 +83,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -89,6 +96,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
 import com.samcod3.meditrack.domain.model.Reminder
+import com.samcod3.meditrack.ui.components.SwipeableCard
+import com.samcod3.meditrack.ui.components.SwipeActionConfig
 import org.koin.androidx.compose.koinViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -108,31 +117,46 @@ fun AllRemindersScreen(
 ) {
     val todayReminders by viewModel.todayReminders.collectAsState()
     val totalReminders by viewModel.totalReminders.collectAsState()
+    val pendingReminders by viewModel.pendingReminders.collectAsState()
+    val pastReminders by viewModel.pastReminders.collectAsState()
     
     val today = SimpleDateFormat("EEEE, d 'de' MMMM", Locale("es", "ES")).format(Date())
     
-    // Group reminders by time
-    val groupedByTime = remember(todayReminders) {
-        todayReminders.groupBy { it.timeFormatted }
+    // Tab state: 0 = Pendientes, 1 = Pasados
+    var selectedTab by remember { mutableStateOf(0) }
+    
+    // Use appropriate data based on tab
+    val displayedReminders = when (selectedTab) {
+        0 -> pendingReminders
+        1 -> pastReminders
+        else -> pendingReminders
     }
     
-    // Calculate which time slot should be expanded (next upcoming)
+    // Calculate which time slot should be expanded (next upcoming for pending)
     val currentHourMinute = remember {
         val cal = java.util.Calendar.getInstance()
         cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
     }
     
-    val nextTimeSlot = remember(groupedByTime) {
-        groupedByTime.keys.firstOrNull { timeStr ->
+    val nextTimeSlot = remember(displayedReminders) {
+        displayedReminders.keys.firstOrNull { timeStr ->
             val parts = timeStr.split(":")
             if (parts.size == 2) {
                 val timeMinutes = parts[0].toIntOrNull()?.times(60)?.plus(parts[1].toIntOrNull() ?: 0) ?: 0
                 timeMinutes >= currentHourMinute
             } else false
-        } ?: groupedByTime.keys.lastOrNull()
+        } ?: displayedReminders.keys.firstOrNull()
     }
     
     val expandedSections by viewModel.expandedSections.collectAsState()
+    
+    // Refresh time periodically
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000) // Every minute
+            viewModel.refreshTime()
+        }
+    }
     
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -161,63 +185,135 @@ fun AllRemindersScreen(
             windowInsets = WindowInsets(0)
         )
         
-        // Initialize expanded section with the next slot if empty
-        LaunchedEffect(nextTimeSlot) {
-            if (nextTimeSlot != null) {
-                viewModel.initExpandedSection(nextTimeSlot)
-            }
-        }
-
-        if (todayReminders.isEmpty()) {
-            EmptyAgendaMessage(profileName = profileName)
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)  // More separation
-            ) {
-                // Header with summary
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CalendarToday,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
+        // Tab Row
+        androidx.compose.material3.TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary
+        ) {
+            androidx.compose.material3.Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Pendientes")
+                        if (pendingReminders.values.flatten().isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            ) {
                                 Text(
-                                    text = "${todayReminders.size} recordatorios para hoy",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "$totalReminders en total activos",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                    text = "${pendingReminders.values.flatten().size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
-                
+            )
+            androidx.compose.material3.Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Pasados")
+                        if (pastReminders.values.flatten().isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.error,
+                                shape = CircleShape
+                            ) {
+                                Text(
+                                    text = "${pastReminders.values.flatten().size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onError,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            )
+        }
+        
+        // Initialize expanded section with the first slot if empty
+        LaunchedEffect(displayedReminders.keys.firstOrNull()) {
+            displayedReminders.keys.firstOrNull()?.let {
+                viewModel.initExpandedSection(it)
+            }
+        }
+
+        if (displayedReminders.isEmpty()) {
+            if (selectedTab == 0) {
+                // No pending reminders
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(80.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "¡Todo al día!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "No tienes recordatorios pendientes",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                // No past reminders
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(80.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Sin recordatorios pasados",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Todos los recordatorios anteriores fueron marcados",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 // Collapsible time sections - unified design
-                groupedByTime.forEach { (time, reminders) ->
+                displayedReminders.forEach { (time, reminders) ->
                     val isExpanded = expandedSections.contains(time)
-                    val isNextSlot = time == nextTimeSlot
+                    val isNextSlot = time == nextTimeSlot && selectedTab == 0
                     
                     item(key = "section_$time") {
                         UnifiedTimeSection(
@@ -225,11 +321,18 @@ fun AllRemindersScreen(
                             reminders = reminders,
                             isExpanded = isExpanded,
                             isHighlighted = isNextSlot,
+                            isPastTab = selectedTab == 1,
                             onHeaderClick = { viewModel.toggleSection(time) },
                             onReminderClick = onReminderClick,
                             onLeafletClick = onLeafletClick,
                             onToggle = { id, enabled -> viewModel.toggleReminder(id, enabled) },
-                            onDelete = { id -> viewModel.deleteReminder(id) }
+                            onDelete = { id -> viewModel.deleteReminder(id) },
+                            onMarkTaken = { reminder -> 
+                                viewModel.markDose(reminder, com.samcod3.meditrack.data.local.entity.DoseLogEntity.STATUS_TAKEN) 
+                            },
+                            onMarkSkipped = { reminder -> 
+                                viewModel.markDose(reminder, com.samcod3.meditrack.data.local.entity.DoseLogEntity.STATUS_SKIPPED) 
+                            }
                         )
                     }
                 }
@@ -237,6 +340,7 @@ fun AllRemindersScreen(
         }
     }
 }
+
 
 @Composable
 private fun EmptyAgendaMessage(profileName: String) {
@@ -381,11 +485,14 @@ private fun UnifiedTimeSection(
     reminders: List<Reminder>,
     isExpanded: Boolean,
     isHighlighted: Boolean,
+    isPastTab: Boolean = false,
     onHeaderClick: () -> Unit,
     onReminderClick: (String, String) -> Unit,
     onLeafletClick: (String) -> Unit,
     onToggle: (String, Boolean) -> Unit,
-    onDelete: (String) -> Unit
+    onDelete: (String) -> Unit,
+    onMarkTaken: (Reminder) -> Unit = {},
+    onMarkSkipped: (Reminder) -> Unit = {}
 ) {
     // Background color based on highlight/expansion
     val containerColor = when {
@@ -485,14 +592,28 @@ private fun UnifiedTimeSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 reminders.forEachIndexed { index, r ->
-                    CompactReminderCard(
-                        reminder = r,
-                        containerColor = containerColor,
-                        onReminderClick = { onReminderClick(r.medicationId, r.medicationName) },
-                        onLeafletClick = { onLeafletClick(r.nationalCode) },
-                        onToggle = { enabled -> onToggle(r.id, enabled) },
-                        onDelete = { onDelete(r.id) }
-                    )
+                    if (isPastTab) {
+                        // Swipeable card for past reminders
+                        PastReminderCard(
+                            reminder = r,
+                            containerColor = containerColor,
+                            isFirst = index == 0,
+                            onReminderClick = { onReminderClick(r.medicationId, r.medicationName) },
+                            onLeafletClick = { onLeafletClick(r.nationalCode) },
+                            onMarkTaken = { onMarkTaken(r) },
+                            onMarkSkipped = { onMarkSkipped(r) }
+                        )
+                    } else {
+                        // Regular card for pending reminders
+                        CompactReminderCard(
+                            reminder = r,
+                            containerColor = containerColor,
+                            onReminderClick = { onReminderClick(r.medicationId, r.medicationName) },
+                            onLeafletClick = { onLeafletClick(r.nationalCode) },
+                            onToggle = { enabled -> onToggle(r.id, enabled) },
+                            onDelete = { onDelete(r.id) }
+                        )
+                    }
                     
                     // Add Divider if not last item
                     if (index < reminders.size - 1) {
@@ -916,3 +1037,269 @@ private fun ConfirmationRow(
 
 // Constante para altura si no existe, o simplemente usar 64.dp
 private val MinTouchTargetSize = 48.dp // O usar heightIn
+
+/**
+ * Reminder card for past tab with swipe-reveal buttons.
+ * Swipe to reveal action buttons, tap button to execute action.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PastReminderCard(
+    reminder: Reminder,
+    containerColor: Color,
+    isFirst: Boolean = false,
+    onReminderClick: () -> Unit,
+    onLeafletClick: () -> Unit,
+    onMarkTaken: () -> Unit,
+    onMarkSkipped: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    
+    // State for revealed buttons - keyed by reminder to reset when item changes
+    var isRevealed by remember(reminder.id) { mutableStateOf(false) }
+    
+    // State for peek hint animation (temporary peek, not full reveal)
+    var peekHint by remember(reminder.id) { mutableStateOf(false) }
+    
+    // Auto-close peek hint after showing it
+    LaunchedEffect(peekHint) {
+        if (peekHint) {
+            kotlinx.coroutines.delay(400)
+            peekHint = false
+        }
+    }
+    
+    // Animated offset for swipe - always go left to reveal buttons on right
+    var offsetX by remember(reminder.id) { mutableStateOf(0f) }
+    val animatedOffsetX by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isRevealed) -160f else 0f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.8f,
+            stiffness = 300f
+        ),
+        label = "reveal_animation"
+    )
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .height(72.dp)
+    ) {
+        // Calculate reveal progress based on drag offset or peek hint
+        val revealProgress = if (offsetX != 0f) {
+            (kotlin.math.abs(offsetX) / 160f).coerceIn(0f, 1f)
+        } else if (isRevealed) {
+            1f
+        } else if (peekHint) {
+            0.4f  // Just a small peek (about 60px)
+        } else {
+            0f
+        }
+        
+        // Animated reveal for smooth transitions
+        val animatedReveal by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = revealProgress,
+            animationSpec = if (offsetX != 0f) {
+                androidx.compose.animation.core.snap()
+            } else {
+                androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f)
+            },
+            label = "reveal_progress"
+        )
+        
+        // Background with buttons that grow progressively (on the LEFT)
+        Row(
+            modifier = Modifier
+                .fillMaxHeight()
+                .align(Alignment.CenterStart),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Taken button - grows from 0 to 80dp (first on left)
+            Box(
+                modifier = Modifier
+                    .width((80 * animatedReveal).dp)
+                    .fillMaxHeight()
+                    .background(Color(0xFF4CAF50))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onMarkTaken()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (animatedReveal > 0.3f) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.alpha((animatedReveal - 0.3f) / 0.7f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        if (animatedReveal > 0.6f) {
+                            Text(
+                                text = "Tomado",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Skip button - grows from 0 to 80dp (second on left)
+            Box(
+                modifier = Modifier
+                    .width((80 * animatedReveal).dp)
+                    .fillMaxHeight()
+                    .background(Color(0xFF757575))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onMarkSkipped()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (animatedReveal > 0.3f) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.alpha((animatedReveal - 0.3f) / 0.7f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        if (animatedReveal > 0.6f) {
+                            Text(
+                                text = "Omitir",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Foreground content (the card itself)
+        val dragOffset = when {
+            offsetX != 0f -> offsetX
+            isRevealed -> 160f  // Positive: move card right to reveal left buttons
+            peekHint -> 60f    // Small peek to show buttons exist
+            else -> 0f
+        }
+        val displayOffset by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = dragOffset,
+            animationSpec = if (offsetX != 0f) {
+                androidx.compose.animation.core.snap()
+            } else {
+                androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 300f)
+            },
+            label = "offset_animation"
+        )
+        
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .offset(x = displayOffset.dp)
+                .pointerInput(reminder.id) {
+                    var leftSwipeAttempt = 0f
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            // Check if user was trying to swipe left (wrong direction)
+                            if (leftSwipeAttempt < -30f && offsetX == 0f) {
+                                // Trigger hint animation (small peek that auto-closes)
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                peekHint = true
+                            } else {
+                                // Normal right swipe logic
+                                isRevealed = kotlin.math.abs(offsetX) > 50f
+                            }
+                            offsetX = 0f
+                            leftSwipeAttempt = 0f
+                        },
+                        onDragCancel = {
+                            offsetX = 0f
+                            leftSwipeAttempt = 0f
+                        },
+                        onHorizontalDrag = { _, dragAmount ->
+                            // Track left swipe attempts (wrong direction)
+                            if (dragAmount < 0 && offsetX == 0f) {
+                                leftSwipeAttempt += dragAmount
+                            }
+                            // Only allow swipe right (positive) to reveal buttons
+                            offsetX = (offsetX + dragAmount).coerceIn(0f, 200f)
+                        }
+                    )
+                }
+                .combinedClickable(
+                    onClick = {
+                        if (isRevealed) {
+                            isRevealed = false
+                        } else {
+                            onReminderClick()
+                        }
+                    },
+                    onLongClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLeafletClick()
+                    }
+                ),
+            color = containerColor,
+            shape = RoundedCornerShape(12.dp),
+            shadowElevation = if (isRevealed) 4.dp else 0.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Swipe indicator (6 dots in 2 columns - iOS style)
+                Row(
+                    modifier = Modifier.padding(end = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    repeat(2) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            repeat(3) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .background(
+                                            Color.White.copy(alpha = 0.6f),
+                                            RoundedCornerShape(2.dp)
+                                        )
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Medication info
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = reminder.medicationName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = reminder.dosageFormatted,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+            }
+        }
+    }
+}

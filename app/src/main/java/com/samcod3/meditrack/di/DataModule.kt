@@ -39,6 +39,7 @@ val dataModule = module {
     single { get<MediTrackDatabase>().reminderDao }
     single { get<MediTrackDatabase>().sectionSummaryCacheDao }
     single { get<MediTrackDatabase>().backupDao }
+    single { get<MediTrackDatabase>().doseLogDao }
     
     // User Preferences (DataStore)
     single { UserPreferencesRepository(androidContext()) }

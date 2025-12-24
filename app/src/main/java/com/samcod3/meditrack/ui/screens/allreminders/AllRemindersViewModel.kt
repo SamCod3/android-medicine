@@ -2,10 +2,14 @@ package com.samcod3.meditrack.ui.screens.allreminders
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.samcod3.meditrack.data.local.dao.DoseLogDao
+import com.samcod3.meditrack.data.local.entity.DoseLogEntity
 import com.samcod3.meditrack.domain.model.Reminder
 import com.samcod3.meditrack.domain.repository.ReminderRepository
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -13,12 +17,20 @@ import java.util.Calendar
 
 /**
  * ViewModel for the global reminders screen.
- * Shows all enabled reminders grouped by time.
+ * Shows all enabled reminders grouped by time with Pending/Past tabs.
  */
 class AllRemindersViewModel(
     private val profileId: String,
-    private val reminderRepository: ReminderRepository
+    private val reminderRepository: ReminderRepository,
+    private val doseLogDao: DoseLogDao
 ) : ViewModel() {
+    
+    // Current time for UI refresh
+    private val _currentTime = MutableStateFlow(getCurrentTimeMinutes())
+    
+    // Logs for today
+    private val todayLogs = doseLogDao.getLogsForDate(profileId, getStartOfDay())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     
     /**
      * Enabled reminders for current profile grouped by hour:minute, sorted by time.
@@ -69,7 +81,7 @@ class AllRemindersViewModel(
             val dayOfMonth = today.get(Calendar.DAY_OF_MONTH)
             
             reminders.filter { reminder ->
-                when (reminder.scheduleType) {
+                reminder.enabled && when (reminder.scheduleType) {
                     com.samcod3.meditrack.data.local.entity.ScheduleType.DAILY -> true
                     com.samcod3.meditrack.data.local.entity.ScheduleType.WEEKLY -> 
                         (reminder.daysOfWeek and dayOfWeek) != 0
@@ -89,13 +101,69 @@ class AllRemindersViewModel(
             initialValue = emptyList()
         )
     
+    /**
+     * Pendientes: hora >= ahora, no marcados
+     */
+    val pendingReminders: StateFlow<Map<String, List<Reminder>>> = combine(
+        todayReminders,
+        todayLogs,
+        _currentTime
+    ) { reminders, logs, currentMinutes ->
+        val loggedKeys = logs.map { "${it.reminderId}_${it.scheduledHour}_${it.scheduledMinute}" }.toSet()
+        reminders
+            .filter { r -> 
+                val reminderMinutes = r.hour * 60 + r.minute
+                reminderMinutes >= currentMinutes && 
+                    "${r.id}_${r.hour}_${r.minute}" !in loggedKeys
+            }
+            .groupBy { it.timeFormatted }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+    
+    /**
+     * Pasados: hora < ahora, no marcados
+     */
+    val pastReminders: StateFlow<Map<String, List<Reminder>>> = combine(
+        todayReminders,
+        todayLogs,
+        _currentTime
+    ) { reminders, logs, currentMinutes ->
+        val loggedKeys = logs.map { "${it.reminderId}_${it.scheduledHour}_${it.scheduledMinute}" }.toSet()
+        reminders
+            .filter { r -> 
+                val reminderMinutes = r.hour * 60 + r.minute
+                reminderMinutes < currentMinutes && 
+                    "${r.id}_${r.hour}_${r.minute}" !in loggedKeys
+            }
+            .groupBy { it.timeFormatted }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+    
+    fun markDose(reminder: Reminder, status: String) {
+        viewModelScope.launch {
+            val log = DoseLogEntity(
+                reminderId = reminder.id,
+                medicationId = reminder.medicationId,
+                medicationName = reminder.medicationName,
+                profileId = profileId,
+                scheduledDate = getStartOfDay(),
+                scheduledHour = reminder.hour,
+                scheduledMinute = reminder.minute,
+                status = status
+            )
+            doseLogDao.insert(log)
+        }
+    }
+    
+    fun refreshTime() {
+        _currentTime.value = getCurrentTimeMinutes()
+    }
+    
     fun toggleReminder(reminderId: String, enabled: Boolean) {
         viewModelScope.launch {
             reminderRepository.setReminderEnabled(reminderId, enabled)
         }
     }
     
-    private val _expandedSections = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+    private val _expandedSections = MutableStateFlow<Set<String>>(emptySet())
     val expandedSections: StateFlow<Set<String>> = _expandedSections
 
     fun toggleSection(time: String) {
@@ -107,10 +175,6 @@ class AllRemindersViewModel(
         }
     }
 
-    /**
-     * Initializes the expanded sections if they are currently empty.
-     * Useful for setting the default "upcoming" slot on first load.
-     */
     fun initExpandedSection(time: String) {
         if (_expandedSections.value.isEmpty()) {
             _expandedSections.value = setOf(time)
@@ -121,5 +185,19 @@ class AllRemindersViewModel(
         viewModelScope.launch {
             reminderRepository.deleteReminder(reminderId)
         }
+    }
+    
+    private fun getCurrentTimeMinutes(): Int {
+        val now = Calendar.getInstance()
+        return now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+    }
+    
+    private fun getStartOfDay(): Long {
+        return Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
 }

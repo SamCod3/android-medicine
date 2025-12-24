@@ -15,37 +15,36 @@ MediTrack is an Android app for scanning Spanish medication barcodes and managin
 
 ## ✅ Recently Completed (Dec 24, 2024)
 
-### Mi Agenda - In-Row Swipe Confirmation 🚀
-- **Pattern:** "In-Row Transformation" (No dialogs).
-- **Behavior:** Swiping transforms the card into a confirmation row (Solid Red for Delete, Blue for Toggle).
-- **Design:**
-  - **Height:** 72dp (increased for better touch targets).
-  - **Padding:** 16dp start padding for visual breathing room.
-  - **Background:** Opaque (matches container) to prevent visual overlap glitches.
-  - **Safety:** Large explicit confirmation buttons with 32dp separation.
-  - **Anti-Fling:** Velocity check requires 50% physical drag to activate.
-- **Tech:** `SwipeToDismissBox` + `AnimatedContent` state transition.
-- **Visuals (Updates):** 3D Shadow effect, Opaque backgrounds, Horizontal dividers, Count Badge in header.
-- **Navigation:**
-  - Click: Reminder Details.
-  - Long Press: Leaflet (Prospecto).
+### Swipe-Reveal Estilo Apple Mail 🍎
+- **Component:** `PastReminderCard` en pestaña "Pasados"
+- **Behavior:** Deslizar → revela [Tomado][Omitir] a la izquierda
+- **Effects:**
+  - Botones crecen progresivamente (0 → 80dp)
+  - Iconos aparecen al 30%, texto al 60%
+  - Pista visual si swipe incorrecta (peek + vibración)
+- **Indicator:** 6 puntos (2x3) estilo iOS, color blanco
+- **State:** key(reminder.id) evita persistencia al cambiar item
 
-### Mi Botiquín - Rediseño Clean & Safety 🛡️
-- **New UI:** Minimalist list (no static icons), alphabetical sorting.
-- **Gestures:**
-  - **Swipe Right:** Delete (In-Row Confirmation).
-  - **Swipe Left:** Navigate to Reminders (Immediate).
-- **Anti-Fling:** Implemented strict velocity check (ignores fast short swipes) + 50% threshold requirement.
-  - Tech: Self-referencing state holder (`dismissStateRef`) to verify positional progress.
+### Agenda con Pestañas
+- Pestañas Pendientes/Pasados
+- Filtrado por hora actual
+- Acciones desde UI y notificaciones
 
-### Other Improvements
-- **Accordion:** Collapsible time sections with 3D effect.
-- **AI Summary:** Full-screen bottom sheet with dynamic WebView.
+### Sistema de Notificaciones
+- ReminderAlarmScheduler integrado
+- Botones "Tomar" y "Omitir" en notificación
+- Deep link al perfil correcto
 
-## 🔴 PENDING: Next Steps
+## 🔴 BUGS PENDIENTES
 
-- **User Testing:** Verify swipe interaction in real-world usage over a few days.
-- **Next Feature:** (To be defined by user).
+### Navegación desde Notificaciones
+- Al pulsar notificación abre Agenda pero NO va a la pestaña correcta
+- Debería abrir pestaña "Pasados" si el recordatorio ya pasó
+
+## 📋 Mejoras Futuras
+
+- Extraer `PastReminderCard` a componente reutilizable
+- Animaciones de eliminación al marcar toma
 
 ## Quick Start
 
@@ -70,16 +69,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk && adb shell am start -
 
 | Area | File |
 |------|------|
-| **AI Summaries** | `domain/usecase/SectionSummaryUseCase.kt` |
-| **Refinement Modes** | `domain/model/RefinementMode.kt` |
-| **AI Services** | `ai/GeminiNanoService.kt`, `ai/HybridAIService.kt` |
-| **Leaflet Parser** | `ai/AILeafletParser.kt` |
-| **Leaflet UI** | `ui/screens/leaflet/LeafletScreen.kt` |
-| **Leaflet VM** | `ui/screens/leaflet/LeafletViewModel.kt` |
-| **Section WebView** | `ui/components/SectionWebView.kt` |
 | **Mi Agenda** | `ui/screens/allreminders/AllRemindersScreen.kt` |
-| **Cache DAO** | `data/local/dao/SectionSummaryCacheDao.kt` |
+| **Swipe-Reveal** | `PastReminderCard` (private fun en AllRemindersScreen) |
+| **Notificaciones** | `notification/ReminderNotificationHelper.kt` |
+| **Deep Link** | `MainActivity.kt`, `NavHost.kt` |
 
-## Recent Work
-- Section BottomSheet: Accordion + WebView full-screen
-- Mi Agenda: Collapsible time sections with auto-expand

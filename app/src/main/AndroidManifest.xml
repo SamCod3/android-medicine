@@ -53,6 +53,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.samcod3.meditrack.MARK_TAKEN" />
+                <action android:name="com.samcod3.meditrack.MARK_SKIPPED" />
             </intent-filter>
         </receiver>
         
