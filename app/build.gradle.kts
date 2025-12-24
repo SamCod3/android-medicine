@@ -71,6 +71,9 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     
+    // DataStore Preferences
+    implementation(libs.androidx.datastore.preferences)
+    
     // Networking
     implementation(libs.retrofit)
     implementation(libs.retrofit.moshi)

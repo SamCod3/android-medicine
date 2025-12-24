@@ -1,13 +1,17 @@
 package com.samcod3.meditrack.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.samcod3.meditrack.data.preferences.UserPreferencesRepository
 import com.samcod3.meditrack.ui.screens.leaflet.LeafletScreen
 import com.samcod3.meditrack.ui.screens.main.MainScreen
 import com.samcod3.meditrack.ui.screens.profiles.ProfileViewModel
@@ -15,7 +19,10 @@ import com.samcod3.meditrack.ui.screens.profiles.ProfilesScreen
 import com.samcod3.meditrack.ui.screens.reminders.ReminderScreen
 import com.samcod3.meditrack.ui.screens.settings.SettingsScreen
 import com.samcod3.meditrack.ui.screens.treatment.MyTreatmentScreen
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 sealed class Screen(val route: String) {
     data object Profiles : Screen("profiles")
@@ -40,6 +47,21 @@ sealed class Screen(val route: String) {
 @Composable
 fun MediTrackNavHost() {
     val navController = rememberNavController()
+    val userPreferencesRepository: UserPreferencesRepository = koinInject()
+    val scope = rememberCoroutineScope()
+    
+    // Check for saved profile on first launch
+    LaunchedEffect(Unit) {
+        val savedProfileId = userPreferencesRepository.activeProfileIdFlow.first()
+        val savedProfileName = userPreferencesRepository.activeProfileNameFlow.first()
+        
+        if (savedProfileId != null && savedProfileName != null) {
+            // Navigate directly to Main if we have a saved profile
+            navController.navigate(Screen.Main.createRoute(savedProfileId, savedProfileName)) {
+                popUpTo(Screen.Profiles.route) { inclusive = true }
+            }
+        }
+    }
     
     NavHost(
         navController = navController,
@@ -52,6 +74,12 @@ fun MediTrackNavHost() {
                 onProfileSelected = { profileId ->
                     val profile = viewModel.getProfileById(profileId)
                     val name = profile?.name ?: "Usuario"
+                    
+                    // Save selected profile to DataStore
+                    scope.launch {
+                        userPreferencesRepository.setActiveProfile(profileId, name)
+                    }
+                    
                     navController.navigate(Screen.Main.createRoute(profileId, name)) {
                         popUpTo(Screen.Profiles.route) { inclusive = true }
                     }
@@ -85,6 +113,10 @@ fun MediTrackNavHost() {
                     navController.navigate(Screen.Treatment.createRoute(profileId, profileName))
                 },
                 onChangeProfile = {
+                    // Clear saved profile so user sees selection screen next time
+                    scope.launch {
+                        userPreferencesRepository.clearActiveProfile()
+                    }
                     navController.navigate(Screen.Profiles.route) {
                         popUpTo(Screen.Main.route) { inclusive = true }
                     }

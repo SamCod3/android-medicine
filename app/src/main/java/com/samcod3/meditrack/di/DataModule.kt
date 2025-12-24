@@ -17,6 +17,7 @@ import com.samcod3.meditrack.domain.repository.UserMedicationRepository
 import com.samcod3.meditrack.domain.usecase.BackupUseCase
 import com.samcod3.meditrack.domain.usecase.ImportTreatmentUseCase
 import com.samcod3.meditrack.domain.usecase.SectionSummaryUseCase
+import com.samcod3.meditrack.data.preferences.UserPreferencesRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
@@ -38,6 +39,9 @@ val dataModule = module {
     single { get<MediTrackDatabase>().reminderDao }
     single { get<MediTrackDatabase>().sectionSummaryCacheDao }
     single { get<MediTrackDatabase>().backupDao }
+    
+    // User Preferences (DataStore)
+    single { UserPreferencesRepository(androidContext()) }
     
     // Repositories
     single<DrugRepository> { DrugRepositoryImpl(get()) }
