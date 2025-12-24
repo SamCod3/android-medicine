@@ -13,32 +13,26 @@ MediTrack is an Android app for scanning Spanish medication barcodes and managin
 
 **Current Branch:** `feature/ai-integration`
 
-## ✅ Recently Completed (Dec 23, 2024)
+## ✅ Recently Completed (Dec 24, 2024)
 
-### AI Summary Section BottomSheet Improvements
-- **Full-screen BottomSheet:** `skipPartiallyExpanded = true`
-- **Accordion behavior:** Summary hidden when showing WebView
-- **WebView with dynamic height:** Uses `weight(1f)` for full available space
-- **WebView LayoutParams:** MATCH_PARENT for proper sizing
-- **Font size:** Increased to 17px for better readability
+### Mi Agenda - In-Row Swipe Confirmation 🚀
+- **Pattern:** "In-Row Transformation" (No dialogs).
+- **Behavior:** Swiping transforms the card into a confirmation row (Solid Red for Delete, Blue for Toggle).
+- **Design:**
+  - **Height:** 72dp (increased for better touch targets).
+  - **Padding:** 16dp start padding for visual breathing room.
+  - **Background:** Opaque (matches container) to prevent visual overlap glitches.
+  - **Safety:** Large explicit confirmation buttons with 32dp separation.
+- **Tech:** `SwipeToDismissBox` + `AnimatedContent` state transition.
 
-### Mi Agenda Accordion Redesign
-- **Collapsible sections by time slot:** Headers like "07:50 (2)" are clickable
-- **Auto-expand next slot:** Calculates which time ≥ current time to expand
-- **CollapsibleTimeHeader:** 16dp corners, count badge in blue pill, chevron on right
-- **Blue border:** Highlighted + expanded sections have blue border
-- **12dp spacing:** Between accordion sections
-- **CompactReminderCard:** Truncated medication names, compact layout
+### Other Improvements
+- **Accordion:** Collapsible time sections with 3D effect.
+- **AI Summary:** Full-screen bottom sheet with dynamic WebView.
 
-## 🔴 PENDING: Improve CompactReminderCard
+## 🔴 PENDING: Next Steps
 
-The medication rows inside expanded accordion sections need refinement:
-- Match mockup design more closely
-- Consider removing visible trash icon (swipe gesture instead?)
-- Better visual hierarchy between medication name and dose
-- Cards should feel as polished as the headers
-
-Reference mockup: See `agenda_collapsible_*.png` in brain folder
+- **User Testing:** Verify swipe interaction in real-world usage over a few days.
+- **Next Feature:** (To be defined by user).
 
 ## Quick Start
 

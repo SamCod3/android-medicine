@@ -49,10 +49,11 @@ class AllRemindersViewModel(
         )
     
     /**
-     * Get reminders for current profile that should fire today based on schedule type.
+     * Get ALL reminders for current profile that should fire today based on schedule type.
+     * Includes both enabled and disabled reminders.
      */
     val todayReminders: StateFlow<List<Reminder>> = reminderRepository
-        .getEnabledRemindersForProfile(profileId)
+        .getAllRemindersForProfile(profileId)
         .map { reminders ->
             val today = Calendar.getInstance()
             val dayOfWeek = when (today.get(Calendar.DAY_OF_WEEK)) {

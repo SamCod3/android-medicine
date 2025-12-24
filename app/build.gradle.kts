@@ -101,6 +101,9 @@ dependencies {
     // Accompanist
     implementation(libs.accompanist.permissions)
     
+    // Swipe Actions
+    implementation(libs.saket.swipe)
+    
     // Jsoup
     implementation(libs.jsoup)
     

@@ -34,6 +34,12 @@ class ReminderRepositoryImpl(
         }
     }
     
+    override fun getAllRemindersForProfile(profileId: String): Flow<List<Reminder>> {
+        return reminderDao.getAllRemindersForProfile(profileId).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+    
     override suspend fun getReminderById(id: String): Reminder? {
         return reminderDao.getReminderById(id)?.toDomain()
     }
