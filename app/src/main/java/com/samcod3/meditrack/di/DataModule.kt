@@ -36,7 +36,6 @@ val dataModule = module {
     single { get<MediTrackDatabase>().profileDao }
     single { get<MediTrackDatabase>().medicationDao }
     single { get<MediTrackDatabase>().reminderDao }
-    single { get<MediTrackDatabase>().summaryCacheDao }
     single { get<MediTrackDatabase>().sectionSummaryCacheDao }
     single { get<MediTrackDatabase>().backupDao }
     
@@ -54,8 +53,8 @@ val dataModule = module {
         )
     }
     
-    // AI Leaflet Parser with summary cache
-    single { com.samcod3.meditrack.ai.AILeafletParser(get(), get()) }
+    // AI Leaflet Parser
+    single { com.samcod3.meditrack.ai.AILeafletParser(get()) }
     
     // Use Cases
     single { ImportTreatmentUseCase(get(), get(), get(), get()) }

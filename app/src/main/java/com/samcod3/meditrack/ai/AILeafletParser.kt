@@ -1,7 +1,6 @@
 package com.samcod3.meditrack.ai
 
 import android.util.Log
-import com.samcod3.meditrack.data.local.dao.SummaryCacheDao
 import com.samcod3.meditrack.data.remote.parser.LeafletHtmlParser
 import com.samcod3.meditrack.domain.model.ContentBlock
 import com.samcod3.meditrack.domain.model.ParsedLeaflet
@@ -19,8 +18,7 @@ import org.jsoup.nodes.TextNode
  * 2. EXTRACT: Convert normalized HTML to ContentBlocks
  */
 class AILeafletParser(
-    private val aiService: AIService,
-    private val summaryCacheDao: SummaryCacheDao? = null
+    private val aiService: AIService
 ) {
     companion object {
         private const val TAG = "AILeafletParser"
