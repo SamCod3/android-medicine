@@ -6,6 +6,7 @@ import com.samcod3.meditrack.domain.model.SavedMedication
 import com.samcod3.meditrack.domain.repository.UserMedicationRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -16,6 +17,7 @@ class HomeViewModel(
     
     val medications: StateFlow<List<SavedMedication>> = userMedicationRepository
         .getMedicationsForProfile(profileId)
+        .map { list -> list.sortedBy { it.name } }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

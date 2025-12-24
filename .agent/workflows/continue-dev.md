@@ -23,7 +23,16 @@ MediTrack is an Android app for scanning Spanish medication barcodes and managin
   - **Padding:** 16dp start padding for visual breathing room.
   - **Background:** Opaque (matches container) to prevent visual overlap glitches.
   - **Safety:** Large explicit confirmation buttons with 32dp separation.
+  - **Anti-Fling:** Velocity check requires 50% physical drag to activate.
 - **Tech:** `SwipeToDismissBox` + `AnimatedContent` state transition.
+
+### Mi Botiquín - Rediseño Clean & Safety 🛡️
+- **New UI:** Minimalist list (no static icons), alphabetical sorting.
+- **Gestures:**
+  - **Swipe Right:** Delete (In-Row Confirmation).
+  - **Swipe Left:** Navigate to Reminders (Immediate).
+- **Anti-Fling:** Implemented strict velocity check (ignores fast short swipes) + 50% threshold requirement.
+  - Tech: Self-referencing state holder (`dismissStateRef`) to verify positional progress.
 
 ### Other Improvements
 - **Accordion:** Collapsible time sections with 3D effect.

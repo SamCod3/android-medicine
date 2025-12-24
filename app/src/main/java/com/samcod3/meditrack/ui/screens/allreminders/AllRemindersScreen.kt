@@ -57,6 +57,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -611,9 +612,22 @@ private fun CompactReminderCard(
             // --- MODO NORMAL (Swipeable) ---
             // Key on enabled state to force recomposition when toggled externally
             androidx.compose.runtime.key(reminder.id, reminder.enabled) {
+                // Truco para acceder al estado dentro de su propia lambda de confirmación
+                // Esto permite ignorar "flings" (gestos rápidos) cortos y forzar el umbral de posición.
+                val dismissStateRef = remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
+
                 val dismissState = rememberSwipeToDismissBoxState(
-                    positionalThreshold = { totalDistance -> totalDistance * 0.4f }, // Un poco antes para reaccionar rápido
+                    positionalThreshold = { totalDistance -> totalDistance * 0.5f },
                     confirmValueChange = { dismissValue ->
+                        // Verificación anti-gesto rápido:
+                        // Si el progreso es menor al 50% (0.5f), rechazamos la acción aunque haya velocidad.
+                        val progress = dismissStateRef.value?.progress ?: 0f
+                        val isPastThreshold = progress >= 0.5f
+
+                        if (!isPastThreshold && dismissValue != SwipeToDismissBoxValue.Settled) {
+                             return@rememberSwipeToDismissBoxState false
+                        }
+
                         when (dismissValue) {
                             SwipeToDismissBoxValue.StartToEnd -> {
                                 // Detectado swipe a derecha -> Solicitar confirmación de BORRAR
@@ -629,10 +643,12 @@ private fun CompactReminderCard(
                         }
                     }
                 )
+                // Actualizamos la referencia
+                dismissStateRef.value = dismissState
 
                 // Haptic feedback simple al cruzar umbral
                 val context = androidx.compose.ui.platform.LocalContext.current
-                val isAboveThreshold = dismissState.progress >= 0.4f && 
+                val isAboveThreshold = dismissState.progress >= 0.5f && 
                     dismissState.dismissDirection != SwipeToDismissBoxValue.Settled
                 
                 LaunchedEffect(isAboveThreshold) {
@@ -656,7 +672,7 @@ private fun CompactReminderCard(
                         // Mismo fondo visual que antes durante el arrastre
                          val direction = dismissState.dismissDirection
                         val progress = dismissState.progress
-                        val threshold = 0.4f
+                        val threshold = 0.5f
                         
                         // Color Transition Logic: DEEP -> INTENSE
                         val backgroundColor = when (direction) {
