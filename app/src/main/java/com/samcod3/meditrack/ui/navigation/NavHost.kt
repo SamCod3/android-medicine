@@ -50,22 +50,24 @@ fun MediTrackNavHost() {
     val userPreferencesRepository: UserPreferencesRepository = koinInject()
     val scope = rememberCoroutineScope()
     
-    // Check for saved profile on first launch
-    LaunchedEffect(Unit) {
-        val savedProfileId = userPreferencesRepository.activeProfileIdFlow.first()
-        val savedProfileName = userPreferencesRepository.activeProfileNameFlow.first()
-        
-        if (savedProfileId != null && savedProfileName != null) {
-            // Navigate directly to Main if we have a saved profile
-            navController.navigate(Screen.Main.createRoute(savedProfileId, savedProfileName)) {
-                popUpTo(Screen.Profiles.route) { inclusive = true }
+    // Determine start destination synchronously to avoid flash
+    // This is a quick DataStore read, safe to do with runBlocking
+    val (startDestination, initialProfileId, initialProfileName) = remember {
+        kotlinx.coroutines.runBlocking {
+            val savedProfileId = userPreferencesRepository.activeProfileIdFlow.first()
+            val savedProfileName = userPreferencesRepository.activeProfileNameFlow.first()
+            
+            if (savedProfileId != null && savedProfileName != null) {
+                Triple(Screen.Main.createRoute(savedProfileId, savedProfileName), savedProfileId, savedProfileName)
+            } else {
+                Triple(Screen.Profiles.route, null, null)
             }
         }
     }
     
     NavHost(
         navController = navController,
-        startDestination = Screen.Profiles.route
+        startDestination = startDestination
     ) {
         composable(Screen.Profiles.route) {
             val viewModel: ProfileViewModel = koinViewModel()
