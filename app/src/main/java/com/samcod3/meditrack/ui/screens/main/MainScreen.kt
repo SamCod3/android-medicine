@@ -85,6 +85,9 @@ fun MainScreen(
                     profileName = profileName,
                     onChangeProfile = onChangeProfile,
                     onReminderClick = onReminderClick,
+                    onLeafletClick = { code -> 
+                         if (code.isNotBlank()) onMedicationClicked(code) // Using onMedicationClicked for Leaflet nav
+                    },
                     onTreatmentClick = onTreatmentClick
                 )
                 1 -> HomeScreen(

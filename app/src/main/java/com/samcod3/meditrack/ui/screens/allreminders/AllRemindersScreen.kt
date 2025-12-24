@@ -9,8 +9,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.with
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +58,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.Switch
@@ -98,6 +102,7 @@ fun AllRemindersScreen(
     profileName: String,
     onChangeProfile: () -> Unit,
     onReminderClick: (medicationId: String, medicationName: String) -> Unit,
+    onLeafletClick: (nationalCode: String) -> Unit,
     onTreatmentClick: () -> Unit,
     viewModel: AllRemindersViewModel = koinViewModel { org.koin.core.parameter.parametersOf(profileId) }
 ) {
@@ -127,10 +132,7 @@ fun AllRemindersScreen(
         } ?: groupedByTime.keys.lastOrNull()
     }
     
-    // State for expanded sections
-    var expandedSections by remember(nextTimeSlot) { 
-        mutableStateOf(setOf(nextTimeSlot ?: ""))
-    }
+    val expandedSections by viewModel.expandedSections.collectAsState()
     
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -159,6 +161,13 @@ fun AllRemindersScreen(
             windowInsets = WindowInsets(0)
         )
         
+        // Initialize expanded section with the next slot if empty
+        LaunchedEffect(nextTimeSlot) {
+            if (nextTimeSlot != null) {
+                viewModel.initExpandedSection(nextTimeSlot)
+            }
+        }
+
         if (todayReminders.isEmpty()) {
             EmptyAgendaMessage(profileName = profileName)
         } else {
@@ -216,14 +225,9 @@ fun AllRemindersScreen(
                             reminders = reminders,
                             isExpanded = isExpanded,
                             isHighlighted = isNextSlot,
-                            onHeaderClick = {
-                                expandedSections = if (isExpanded) {
-                                    expandedSections - time
-                                } else {
-                                    expandedSections + time
-                                }
-                            },
+                            onHeaderClick = { viewModel.toggleSection(time) },
                             onReminderClick = onReminderClick,
+                            onLeafletClick = onLeafletClick,
                             onToggle = { id, enabled -> viewModel.toggleReminder(id, enabled) },
                             onDelete = { id -> viewModel.deleteReminder(id) }
                         )
@@ -378,111 +382,124 @@ private fun UnifiedTimeSection(
     isExpanded: Boolean,
     isHighlighted: Boolean,
     onHeaderClick: () -> Unit,
-    onReminderClick: (medicationId: String, medicationName: String) -> Unit,
-    onToggle: (reminderId: String, enabled: Boolean) -> Unit,
-    onDelete: (reminderId: String) -> Unit
+    onReminderClick: (String, String) -> Unit,
+    onLeafletClick: (String) -> Unit,
+    onToggle: (String, Boolean) -> Unit,
+    onDelete: (String) -> Unit
 ) {
-    val backgroundColor = if (isHighlighted) 
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-    else 
-        MaterialTheme.colorScheme.surfaceContainer
-    
-    val borderColor = when {
-        isHighlighted -> MaterialTheme.colorScheme.primary
-        isExpanded -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f) // Visible colored border
-        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+    // Background color based on highlight/expansion
+    val containerColor = when {
+        isHighlighted -> MaterialTheme.colorScheme.primaryContainer
+        isExpanded -> MaterialTheme.colorScheme.surfaceContainerHigh 
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     }
     
-    val borderWidth = when {
-        isHighlighted -> 2.dp
-        isExpanded -> 1.5.dp
-        else -> 0.5.dp
-    }
-    
-    // Elevation for 3D effect - expanded sections come forward
-    val elevation = if (isExpanded || isHighlighted) 12.dp else 0.dp
-    
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = backgroundColor,
-        shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(borderWidth, borderColor),
-        shadowElevation = elevation,
-        tonalElevation = if (isExpanded) 6.dp else 0.dp
+    // Elevation for 3D effect
+    val elevation = if (isExpanded || isHighlighted) 6.dp else 0.dp
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .shadow(elevation, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(containerColor)
+            .padding(12.dp)
     ) {
-        Column {
-            // Header - always visible
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onHeaderClick)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        // --- Header Section ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onHeaderClick)
+                .padding(vertical = 8.dp), // Reduced padding (12 -> 8)
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.AccessTime,
+                    contentDescription = null,
+                    tint = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                // Time
                 Text(
                     text = time,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge, // Kept TitleLarge but reduced padding
                     fontWeight = FontWeight.Bold,
-                    color = if (isHighlighted)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                // Count badge
+                // Count Badge
                 Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(12.dp)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    shape = CircleShape
                 ) {
                     Text(
-                        text = "(${reminders.size})",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "(${reminders.size})", // Count restored
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(
-                    imageVector = if (isExpanded) 
-                        Icons.Default.KeyboardArrowDown 
-                    else 
-                        Icons.Default.KeyboardArrowRight,
-                    contentDescription = if (isExpanded) "Colapsar" else "Expandir",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(28.dp)
-                )
+
+                if (isHighlighted) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.primary,
+                                CircleShape
+                            )
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "Próximo",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
             }
             
-            // Content - only when expanded
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Column(
-                    modifier = Modifier.padding(
-                        start = 12.dp,
-                        end = 12.dp,
-                        bottom = 12.dp
-                    )
-                ) {
+            Spacer(modifier = Modifier.weight(1f))
 
-                    reminders.forEachIndexed { index, reminder ->
-                        CompactReminderCard(
-                            reminder = reminder,
-                            containerColor = backgroundColor, // Pass opaque background color
-                            onClick = { onReminderClick(reminder.medicationId, reminder.medicationName) },
-                            onToggle = { enabled -> onToggle(reminder.id, enabled) },
-                            onDelete = { onDelete(reminder.id) }
-                        )
-                        // Add divider between items (not after last)
-                        if (index < reminders.size - 1) {
-                            androidx.compose.material3.HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 6.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                                thickness = 1.dp
-                            )
-                        }
+            // Expand/Collapse Icon
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                contentDescription = if (isExpanded) "Colapsar" else "Expandir",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        // --- Content Section (Medications) ---
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isExpanded,
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+        ) {
+            Column(
+                modifier = Modifier.padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                reminders.forEachIndexed { index, r ->
+                    CompactReminderCard(
+                        reminder = r,
+                        containerColor = containerColor,
+                        onReminderClick = { onReminderClick(r.medicationId, r.medicationName) },
+                        onLeafletClick = { onLeafletClick(r.nationalCode) },
+                        onToggle = { enabled -> onToggle(r.id, enabled) },
+                        onDelete = { onDelete(r.id) }
+                    )
+                    
+                    // Add Divider if not last item
+                    if (index < reminders.size - 1) {
+                         HorizontalDivider(
+                             modifier = Modifier.padding(horizontal = 8.dp),
+                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                         )
                     }
                 }
             }
@@ -573,12 +590,13 @@ private fun CollapsibleTimeHeader(
  * Compact reminder card for accordion content with swipe gestures.
  * Swipe right = delete, swipe left = toggle enabled/disabled.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun CompactReminderCard(
     reminder: Reminder,
     containerColor: Color, // New parameter
-    onClick: () -> Unit,
+    onReminderClick: () -> Unit,
+    onLeafletClick: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -722,51 +740,78 @@ private fun CompactReminderCard(
                         }
                     },
                     content = {
-                        Row(
+                        val borderColor = if (false) 
+                            MaterialTheme.colorScheme.primary 
+                        else 
+                            androidx.compose.ui.graphics.Color.Transparent
+                        
+                        val haptic = LocalHapticFeedback.current
+
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(min = 72.dp) // Altura ajustada a 72dp
-                                .background(containerColor) // Use the passed OPAQUE color
-                                .clickable(onClick = onClick)
-                                .padding(start = 16.dp, top = 12.dp, end = 8.dp, bottom = 12.dp), // Padding explícito y ajustado
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (reminder.enabled) 
-                                    Icons.Default.NotificationsActive 
-                                else 
-                                    Icons.Default.NotificationsOff,
-                                contentDescription = null,
-                                tint = if (reminder.enabled)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier.size(24.dp)
-                            )
-                            
-                            Spacer(modifier = Modifier.width(12.dp))
-                            
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = reminder.medicationName,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (reminder.enabled)
-                                        MaterialTheme.colorScheme.onSurface
+                                .clip(RoundedCornerShape(12.dp))
+                                .combinedClickable(
+                                    onClick = onReminderClick,
+                                    onLongClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onLeafletClick()
+                                    }
+                                )
+                                .then(
+                                    if (borderColor != androidx.compose.ui.graphics.Color.Transparent)
+                                        Modifier.padding(2.dp)
                                     else
-                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                        Modifier
+                                ),
+                            color = containerColor,
+                            shape = RoundedCornerShape(12.dp),
+                            border = null
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 72.dp)
+                                    .padding(start = 16.dp, top = 12.dp, end = 8.dp, bottom = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (reminder.enabled) 
+                                        Icons.Default.NotificationsActive 
+                                    else 
+                                        Icons.Default.NotificationsOff,
+                                    contentDescription = null,
+                                    tint = if (reminder.enabled)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(24.dp)
                                 )
-                                Text(
-                                    text = "${reminder.dosageFormatted} · ${reminder.scheduleFormatted}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                        alpha = if (reminder.enabled) 0.8f else 0.4f
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                
+                                Spacer(modifier = Modifier.width(12.dp))
+                                
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = reminder.medicationName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (reminder.enabled)
+                                            MaterialTheme.colorScheme.onSurface
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${reminder.dosageFormatted} · ${reminder.scheduleFormatted}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                            alpha = if (reminder.enabled) 0.8f else 0.4f
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }

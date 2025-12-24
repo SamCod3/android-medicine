@@ -95,6 +95,28 @@ class AllRemindersViewModel(
         }
     }
     
+    private val _expandedSections = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+    val expandedSections: StateFlow<Set<String>> = _expandedSections
+
+    fun toggleSection(time: String) {
+        val current = _expandedSections.value
+        if (current.contains(time)) {
+             _expandedSections.value = current - time
+        } else {
+             _expandedSections.value = current + time
+        }
+    }
+
+    /**
+     * Initializes the expanded sections if they are currently empty.
+     * Useful for setting the default "upcoming" slot on first load.
+     */
+    fun initExpandedSection(time: String) {
+        if (_expandedSections.value.isEmpty()) {
+            _expandedSections.value = setOf(time)
+        }
+    }
+
     fun deleteReminder(reminderId: String) {
         viewModelScope.launch {
             reminderRepository.deleteReminder(reminderId)
